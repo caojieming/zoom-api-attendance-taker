@@ -1,8 +1,14 @@
-// Global constants used for the Zoom API requests (as requested by the user)
-const FROM = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // One week ago (YYYY-MM-DD)
-const TO = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
+// The most up to date version of this code
+// This is all untested code. Need to fill in credentials in globals.gs with the Zoom App credentials
+
+const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
+const ONE_WEEK_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // One week ago (YYYY-MM-DD)
+const ONE_MONTH_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+const FROM = ONE_WEEK_AGO;
+const TO = NOW;
 const MEETING_TYPE = "meeting"; // Type of meeting (meeting or webinar)
-const SEARCH_KEY = ""; // Optional search query key
+const SEARCH_KEY = ""; // Optional search query key if you only want meetings with specific word(s) in the topic name
 const PAGE_SIZE = 50; // Max meetings per page (up to 300)
 
 /**
@@ -18,15 +24,8 @@ function getAndWritePastMeetingParticipants() {
   var nextMeetingPageToken = "";
 
   // 1. Paginated fetch of past meetings from the Zoom report API
-  // PERSONAL NOTE: for some dumb reason, AI generated code has been incredibly inconsistent with how history_meetings should be called. The commented code is what the API documentation says should be correct (what I manually made), uncommented code is what the AI generated code says should work (which is completely different from what the API docs say)
   do {
-    // var url = "https://api.zoom.us/v2" + "/report/history_meetings" +
-    //   "?from=" + FROM +
-    //   "&to=" + TO +
-    //   "&page_size=" + PAGE_SIZE +
-    //   "&meeting_type=" + MEETING_TYPE;
-
-    var url = "https://api.zoom.us/v2/accounts/" + ACCOUNT_ID + "/report/history_meetings" +
+    var url = "https://api.zoom.us/v2" + "/report/history_meetings" +
       "?from=" + FROM +
       "&to=" + TO +
       "&page_size=" + PAGE_SIZE +
@@ -52,6 +51,7 @@ function getAndWritePastMeetingParticipants() {
 
     if (responseCode === 200) {
       var data = JSON.parse(response.getContentText());
+      // console.log(data);
       if (data.history_meetings && data.history_meetings.length > 0) {
         meetings = meetings.concat(data.history_meetings);
       }
@@ -62,20 +62,25 @@ function getAndWritePastMeetingParticipants() {
     }
   } while (nextMeetingPageToken);
 
+  // console.log(meetings);
+
   // Filter for unique meetings based on UUID
   var uniqueMeetings = [];
   var seenUuids = new Set();
   meetings.forEach(function (meeting) {
-    if (meeting.uuid && !seenUuids.has(meeting.uuid)) {
-      seenUuids.add(meeting.uuid);
+    if (meeting.meeting_uuid && !seenUuids.has(meeting.meeting_uuid)) {
+      seenUuids.add(meeting.meeting_uuid);
       uniqueMeetings.push(meeting);
     }
   });
 
+  // console.log(uniqueMeetings);
+  // console.log(seenUuids);
+
   // 2. Iterate through each unique meeting and build the spreadsheets
   uniqueMeetings.forEach(function (meeting) {
-    var rawUuid = meeting.uuid;
-    var meetingId = meeting.id;
+    var rawUuid = meeting.meeting_uuid;
+    var meetingId = meeting.meeting_id;
     var topic = meeting.topic || "Untitled Meeting";
     var startTime = meeting.start_time || "";
     var endTime = meeting.end_time || "";
@@ -86,14 +91,14 @@ function getAndWritePastMeetingParticipants() {
     // Format sheet name: MM/DD/YYYY, Topic
     var dateString = formatMeetingDate(startTime);
     var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
-    var sheetName = dateString + ", " + sanitizedTopic;
+    var sheetName = dateString + ", " + sanitizedTopic + ", " + rawUuid;
     if (sheetName.length > 100) {
       sheetName = sheetName.substring(0, 100);
     }
 
     // Skip if a sheet with this name already exists
     if (ss.getSheetByName(sheetName)) {
-      console.log("Sheet '" + sheetName + "' already exists. Skipping.");
+      console.log("Sheet '" + sheetName + "' already exists. UUID: " + rawUuid + ". Skipping.");
       return;
     }
 
@@ -200,6 +205,13 @@ function getAndWritePastMeetingParticipants() {
       });
       newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
     }
+
+    // auto resize columns
+    const dataRange = newSheet.getDataRange();
+    if (dataRange.getNumColumns() > 0) {
+      newSheet.autoResizeColumns(1, dataRange.getNumColumns());
+    }
+
   });
 }
 

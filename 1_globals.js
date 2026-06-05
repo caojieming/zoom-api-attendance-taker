@@ -1,7 +1,6 @@
+const ACCOUNT_ID = '';
 const CLIENT_ID = '';
 const CLIENT_SECRET = '';
-const ACCOUNT_ID = '';
-// const ZOOM_USER_ID = ''; // email or Zoom userId. Should NOT be needed for the endpoints I use here
 
 function getZoomAccessToken() {
     const tokenUrl = 'https://zoom.us/oauth/token';
