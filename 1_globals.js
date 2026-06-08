@@ -1,6 +1,7 @@
-const ACCOUNT_ID = '';
-const CLIENT_ID = '';
-const CLIENT_SECRET = '';
+// set these according to your Zoom App
+const ACCOUNT_ID = 'q8NUOjMPT0-V6NlQXzPE4A';
+const CLIENT_ID = '_F_cBZz7SeugyGYAsBtvg';
+const CLIENT_SECRET = 'Q05iEQ0adlyGkU4CNySZJio2CAYvRaF6';
 
 function getZoomAccessToken() {
     const tokenUrl = 'https://zoom.us/oauth/token';

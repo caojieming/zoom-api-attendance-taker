@@ -1,15 +1,23 @@
-// The most up to date version of this code
-// This is all untested code. Need to fill in credentials in globals.gs with the Zoom App credentials
-
+// helper constants used for setting FROM and TO times
 const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
+const ONE_DAY_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const THREE_DAYS_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 const ONE_WEEK_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // One week ago (YYYY-MM-DD)
 const ONE_MONTH_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+
+// request constants, these are sent to Zoom API as part of the request
+
+// time period of past meetings to GET
 const FROM = ONE_WEEK_AGO;
 const TO = NOW;
-const MEETING_TYPE = "meeting"; // Type of meeting (meeting or webinar)
-const SEARCH_KEY = ""; // Optional search query key if you only want meetings with specific word(s) in the topic name
-const PAGE_SIZE = 50; // Max meetings per page (up to 300)
+// Type of meeting (meeting or webinar, can also send "" for both)
+const MEETING_TYPE = "meeting";
+// Optional search query key if you only want meetings with specific word(s) in the topic name
+const SEARCH_KEY = "";
+// Max meetings per request page (up to 300), used to lower request rate to prevent hitting API rate limits
+const PAGE_SIZE = 100;
+
 
 /**
  * Main function to get historical Zoom meetings within the past week,
@@ -85,15 +93,16 @@ function getAndWritePastMeetingParticipants() {
     var startTime = meeting.start_time || "";
     var endTime = meeting.end_time || "";
     var duration = meeting.duration || 0;
-    var hostDisplayName = meeting.user_name || "";
-    var hostEmail = meeting.user_email || "";
+    var hostDisplayName = meeting.host_display_name || "";
+    var hostEmail = meeting.host_email || "";
+    var totalParticipantsCount = meeting.participants;
 
     // Format sheet name: MM/DD/YYYY, Topic
-    var dateString = formatMeetingDate(startTime);
+    // var dateString = formatMeetingDate(startTime);
     var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
-    var sheetName = dateString + ", " + sanitizedTopic + ", " + rawUuid;
-    if (sheetName.length > 100) {
-      sheetName = sheetName.substring(0, 100);
+    var sheetName = convertISOTimeZone(startTime) + ", " + sanitizedTopic;
+    if (sheetName.length > 50) {
+      sheetName = sheetName.substring(0, 50) + "...";
     }
 
     // Skip if a sheet with this name already exists
@@ -144,8 +153,8 @@ function getAndWritePastMeetingParticipants() {
         uniqueKeys.add(key.toString().toLowerCase().trim());
       }
     });
-    var uniqueViewersCount = uniqueKeys.size;
-    var totalParticipantsCount = participants.length;
+    var uniqueParticipantsCount = uniqueKeys.size;
+
 
     // Insert new sheet for the meeting
     var newSheet = ss.insertSheet(sheetName);
@@ -158,7 +167,7 @@ function getAndWritePastMeetingParticipants() {
       "host_display_name",
       "host_email",
       "participants",
-      "unique_viewers",
+      "unique_participants",
       "duration",
       "start_time",
       "end_time"
@@ -171,7 +180,7 @@ function getAndWritePastMeetingParticipants() {
       hostDisplayName,
       hostEmail,
       totalParticipantsCount,
-      uniqueViewersCount,
+      uniqueParticipantsCount,
       duration,
       startTime,
       endTime
@@ -231,6 +240,21 @@ function formatMeetingDate(dateStr) {
     var year = date.getUTCFullYear();
     return month + "/" + day + "/" + year;
   }
+}
+
+/**
+ * Converts input ISO 8601 (UTC) string into a specified locale string (default PT)
+ * iso format: '2023-06-08T18:30:00Z'
+ * newTimeZone format: 'America/Los_Angeles'
+ */
+function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
+  const dt = new Date(iso);
+  const converted = dt.toLocaleString('en-US', {
+    timeZone: newTimeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+  });
+  return converted; // e.g. "06/08/2023, 11:30:00"
 }
 
 /**
