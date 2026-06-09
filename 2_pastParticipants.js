@@ -4,17 +4,18 @@ const ONE_DAY_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
 const THREE_DAYS_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 const ONE_WEEK_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // One week ago (YYYY-MM-DD)
 const ONE_MONTH_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const THREE_MONTHS_AGO = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
 
 // request constants, these are sent to Zoom API as part of the request
 
 // time period of past meetings to GET
-const FROM = ONE_WEEK_AGO;
+const FROM = THREE_MONTHS_AGO;
 const TO = NOW;
 // Type of meeting (meeting or webinar, can also send "" for both)
 const MEETING_TYPE = "meeting";
 // Optional search query key if you only want meetings with specific word(s) in the topic name
-const SEARCH_KEY = "";
+const SEARCH_KEY = "PDA AI";
 // Max meetings per request page (up to 300), used to lower request rate to prevent hitting API rate limits
 const PAGE_SIZE = 100;
 
@@ -99,8 +100,9 @@ function getAndWritePastMeetingParticipants() {
 
     // Format sheet name: MM/DD/YYYY, Topic
     // var dateString = formatMeetingDate(startTime);
-    var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
-    var sheetName = convertISOTimeZone(startTime) + ", " + sanitizedTopic;
+    // var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
+    // var sheetName = convertISOTimeZone(startTime) + ", " + sanitizedTopic;
+    var sheetName = convertISOTimeZone(startTime);
     if (sheetName.length > 50) {
       sheetName = sheetName.substring(0, 50) + "...";
     }
@@ -181,9 +183,9 @@ function getAndWritePastMeetingParticipants() {
       hostEmail,
       totalParticipantsCount,
       uniqueParticipantsCount,
-      duration,
-      startTime,
-      endTime
+      minutesToHM(duration),
+      timeOnly(convertISOTimeZone(startTime)),
+      timeOnly(convertISOTimeZone(endTime))
     ];
 
     newSheet.getRange(1, 8, 1, detailsHeaders.length).setValues([detailsHeaders]);
@@ -207,21 +209,51 @@ function getAndWritePastMeetingParticipants() {
           p.id || "",
           p.name || "",
           p.user_email || "",
-          p.join_time || "",
-          p.leave_time || "",
-          p.duration || 0
+          timeOnly(convertISOTimeZone(p.join_time)) || "",
+          timeOnly(convertISOTimeZone(p.leave_time)) || "",
+          secondsToHMS(p.duration) || 0
         ];
       });
       newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
     }
 
     // auto resize columns
-    const dataRange = newSheet.getDataRange();
-    if (dataRange.getNumColumns() > 0) {
-      newSheet.autoResizeColumns(1, dataRange.getNumColumns());
-    }
+    resizeColumnsToFit(newSheet);
+
+    // add a filter to columns A to F
+    newSheet.getRange("A:F").createFilter();
 
   });
+}
+
+
+// converts a string representing minutes into hours, minutes
+function minutesToHM(minutes) {
+  const n = parseFloat(minutes);
+  if (!isFinite(n)) return '0h 0m 0s';
+  const total = Math.floor(Math.abs(n));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h}h ${m}m`;
+}
+
+// converts a string representing seconds into hours, minutes, seconds, format: "0h 0m 0s"
+function secondsToHMS(seconds) {
+  const n = parseFloat(seconds);
+  if (!isFinite(n)) return '0h 0m 0s';
+  const total = Math.floor(Math.abs(n));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
+// simple func that takes in a sheet and auto resizes all columns that contain values
+function resizeColumnsToFit(sheet) {
+  const dataRange = sheet.getDataRange();
+  if (dataRange.getNumColumns() > 0) {
+    sheet.autoResizeColumns(1, dataRange.getNumColumns());
+  }
 }
 
 /**
@@ -254,7 +286,21 @@ function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
   });
-  return converted; // e.g. "06/08/2023, 11:30:00"
+  return converted; // e.g. "06/08/2023, 11:30:00 AM"
+}
+
+// intended to be used after convertISOTimeZone(), returns only the date
+function dateOnly(datetime) {
+  const i = datetime.indexOf(' ');
+  const date = datetime.slice(0, i);
+  return date;
+}
+
+// intended to be used after convertISOTimeZone(), returns only the time
+function timeOnly(datetime) {
+  const i = datetime.indexOf(' ');
+  const time = datetime.slice(i + 1);
+  return time;
 }
 
 /**
