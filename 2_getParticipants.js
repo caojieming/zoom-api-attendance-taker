@@ -1,21 +1,54 @@
-// The most up to date version of this code
-// This is all untested code. Need to fill in credentials in globals.gs with the Zoom App credentials
-
+// helper constants used for setting FROM and TO times
 const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
+const ONE_DAY_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const THREE_DAYS_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 const ONE_WEEK_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // One week ago (YYYY-MM-DD)
 const ONE_MONTH_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const TWO_MONTHS_AGO = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const THREE_MONTHS_AGO = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const FOUR_MONTHS_AGO = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const FIVE_MONTHS_AGO = new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const SIX_MONTHS_AGO = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-const FROM = ONE_WEEK_AGO;
+
+// request constants, these are sent to Zoom API as part of the request
+// time period of past meetings to GET
+const FROM = SIX_MONTHS_AGO;
 const TO = NOW;
-const MEETING_TYPE = "meeting"; // Type of meeting (meeting or webinar)
-const SEARCH_KEY = ""; // Optional search query key if you only want meetings with specific word(s) in the topic name
-const PAGE_SIZE = 50; // Max meetings per page (up to 300)
+// Type of meeting (meeting or webinar, can also send "" for both)
+const MEETING_TYPE = "meeting";
+// Optional search query key if you only want meetings with specific word(s) in the topic name
+const SEARCH_KEY = "";
+// Max meetings per request page (up to 300), used to lower request rate to prevent hitting API rate limits
+const PAGE_SIZE = 200;
+
+
+// extra constants, used for misc filtering
+const MEETING_ID = "";
+
+// toggle to include or not include notetakers
+const INCLUDE_NOTETAKERS = false;
+
+
+
+// can't get more than 1 month worth of records at a time, need to call multiple times
+function getParticipantsHalfYear() {
+  getParticipants(ONE_MONTH_AGO, NOW);
+  getParticipants(TWO_MONTHS_AGO, ONE_MONTH_AGO);
+  getParticipants(THREE_MONTHS_AGO, TWO_MONTHS_AGO);
+  getParticipants(FOUR_MONTHS_AGO, THREE_MONTHS_AGO);
+  getParticipants(FIVE_MONTHS_AGO, FOUR_MONTHS_AGO);
+  getParticipants(SIX_MONTHS_AGO, FIVE_MONTHS_AGO);
+}
+
 
 /**
  * Main function to get historical Zoom meetings within the past week,
  * extract details and participant lists, and write them into Google Sheets.
+ * inFrom: start date of time period observed, defaulting to const FROM
+ * inTo: end date of time period observed, defaulting to const TO
  */
-function getAndWritePastMeetingParticipants() {
+function getParticipants(inFrom = FROM, inTo = TO) {
   // Fetch access token using existing client function (assumed to be defined globally)
   var accessToken = getZoomAccessToken();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -26,8 +59,8 @@ function getAndWritePastMeetingParticipants() {
   // 1. Paginated fetch of past meetings from the Zoom report API
   do {
     var url = "https://api.zoom.us/v2" + "/report/history_meetings" +
-      "?from=" + FROM +
-      "&to=" + TO +
+      "?from=" + inFrom +
+      "&to=" + inTo +
       "&page_size=" + PAGE_SIZE +
       "&meeting_type=" + MEETING_TYPE;
 
@@ -79,21 +112,34 @@ function getAndWritePastMeetingParticipants() {
 
   // 2. Iterate through each unique meeting and build the spreadsheets
   uniqueMeetings.forEach(function (meeting) {
-    var rawUuid = meeting.meeting_uuid;
     var meetingId = meeting.meeting_id;
+
+    // optional check/filter for meeting ID
+    // if const MEETING_ID is filled/is not empty
+    if (MEETING_ID !== "") {
+      // if current meeting ID does not equal const MEETING_ID, skip (note, use soft inequality check: meetingId is apparently not a string)
+      if (meetingId != MEETING_ID) {
+        return;
+      }
+    }
+
+    var rawUuid = meeting.meeting_uuid;
     var topic = meeting.topic || "Untitled Meeting";
     var startTime = meeting.start_time || "";
     var endTime = meeting.end_time || "";
     var duration = meeting.duration || 0;
-    var hostDisplayName = meeting.user_name || "";
-    var hostEmail = meeting.user_email || "";
+    var hostDisplayName = meeting.host_display_name || "";
+    var hostEmail = meeting.host_email || "";
+    // var totalParticipantsCount = meeting.participants;
+    // will manually count totalParticipantsCount later, this is important if we disable INCLUDE_NOTETAKERS
 
     // Format sheet name: MM/DD/YYYY, Topic
-    var dateString = formatMeetingDate(startTime);
-    var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
-    var sheetName = dateString + ", " + sanitizedTopic + ", " + rawUuid;
-    if (sheetName.length > 100) {
-      sheetName = sheetName.substring(0, 100);
+    // var dateString = formatMeetingDate(startTime);
+    // var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
+    // var sheetName = convertISOTimeZone(startTime) + ", " + sanitizedTopic;
+    var sheetName = convertISOTimeZone(startTime);
+    if (sheetName.length > 50) {
+      sheetName = sheetName.substring(0, 50) + "...";
     }
 
     // Skip if a sheet with this name already exists
@@ -136,16 +182,25 @@ function getAndWritePastMeetingParticipants() {
       }
     } while (participantNextPageToken);
 
-    // Count unique viewers based on email/ID/name
-    var uniqueKeys = new Set();
+    // sanitize participants list (optionally remove Notetakers)
+    var sanitizedParticipants = [];
     participants.forEach(function (p) {
-      var key = p.user_email || p.id || p.name;
-      if (key) {
-        uniqueKeys.add(key.toString().toLowerCase().trim());
+      // skip cases
+      if (!INCLUDE_NOTETAKERS && p.name.toString().toLowerCase().includes("notetaker")) {
+        return;
       }
+
+      totalParticipantsCount++;
+      sanitizedParticipants.push(p);
     });
-    var uniqueViewersCount = uniqueKeys.size;
-    var totalParticipantsCount = participants.length;
+    var totalParticipantsCount = sanitizedParticipants.length;
+
+    // if totalParticipantsCount = 0, then all participants were notetakers: skip this meeting
+    // if totalParticipantsCount = 1, then it can hardly by called a meeting: skip this meeting
+    if (totalParticipantsCount <= 1) {
+      return;
+    }
+
 
     // Insert new sheet for the meeting
     var newSheet = ss.insertSheet(sheetName);
@@ -158,7 +213,6 @@ function getAndWritePastMeetingParticipants() {
       "host_display_name",
       "host_email",
       "participants",
-      "unique_viewers",
       "duration",
       "start_time",
       "end_time"
@@ -171,10 +225,9 @@ function getAndWritePastMeetingParticipants() {
       hostDisplayName,
       hostEmail,
       totalParticipantsCount,
-      uniqueViewersCount,
-      duration,
-      startTime,
-      endTime
+      minutesToHM(duration),
+      timeOnly(convertISOTimeZone(startTime)),
+      timeOnly(convertISOTimeZone(endTime))
     ];
 
     newSheet.getRange(1, 8, 1, detailsHeaders.length).setValues([detailsHeaders]);
@@ -192,27 +245,57 @@ function getAndWritePastMeetingParticipants() {
 
     newSheet.getRange(1, 1, 1, participantHeaders.length).setValues([participantHeaders]);
 
-    if (participants.length > 0) {
-      var participantRows = participants.map(function (p) {
+    if (sanitizedParticipants.length > 0) {
+      var participantRows = sanitizedParticipants.map(function (p) {
         return [
           p.id || "",
           p.name || "",
           p.user_email || "",
-          p.join_time || "",
-          p.leave_time || "",
-          p.duration || 0
+          timeOnly(convertISOTimeZone(p.join_time)) || "",
+          timeOnly(convertISOTimeZone(p.leave_time)) || "",
+          secondsToHMS(p.duration) || 0
         ];
       });
       newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
     }
 
     // auto resize columns
-    const dataRange = newSheet.getDataRange();
-    if (dataRange.getNumColumns() > 0) {
-      newSheet.autoResizeColumns(1, dataRange.getNumColumns());
-    }
+    resizeColumnsToFit(newSheet);
+
+    // add a filter to columns A to F
+    newSheet.getRange("A:F").createFilter();
 
   });
+}
+
+
+// converts a string representing minutes into hours, minutes
+function minutesToHM(minutes) {
+  const n = parseFloat(minutes);
+  if (!isFinite(n)) return '0h 0m 0s';
+  const total = Math.floor(Math.abs(n));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${h}h ${m}m`;
+}
+
+// converts a string representing seconds into hours, minutes, seconds, format: "0h 0m 0s"
+function secondsToHMS(seconds) {
+  const n = parseFloat(seconds);
+  if (!isFinite(n)) return '0h 0m 0s';
+  const total = Math.floor(Math.abs(n));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
+// simple func that takes in a sheet and auto resizes all columns that contain values
+function resizeColumnsToFit(sheet) {
+  const dataRange = sheet.getDataRange();
+  if (dataRange.getNumColumns() > 0) {
+    sheet.autoResizeColumns(1, dataRange.getNumColumns());
+  }
 }
 
 /**
@@ -231,6 +314,35 @@ function formatMeetingDate(dateStr) {
     var year = date.getUTCFullYear();
     return month + "/" + day + "/" + year;
   }
+}
+
+/**
+ * Converts input ISO 8601 (UTC) string into a specified locale string (default PT)
+ * iso format: '2023-06-08T18:30:00Z'
+ * newTimeZone format: 'America/Los_Angeles'
+ */
+function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
+  const dt = new Date(iso);
+  const converted = dt.toLocaleString('en-US', {
+    timeZone: newTimeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+  });
+  return converted; // e.g. "06/08/2023, 11:30:00 AM"
+}
+
+// intended to be used after convertISOTimeZone(), returns only the date
+function dateOnly(datetime) {
+  const i = datetime.indexOf(' ');
+  const date = datetime.slice(0, i);
+  return date;
+}
+
+// intended to be used after convertISOTimeZone(), returns only the time
+function timeOnly(datetime) {
+  const i = datetime.indexOf(' ');
+  const time = datetime.slice(i + 1);
+  return time;
 }
 
 /**
