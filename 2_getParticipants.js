@@ -26,6 +26,9 @@ const PAGE_SIZE = 200;
 // extra constants, used for misc filtering
 const MEETING_ID = "";
 
+// toggle to include only 4th thursdays of the month
+const ONLY_FOURTH_THURS = true;
+
 // toggle to include or not include notetakers
 const INCLUDE_NOTETAKERS = false;
 
@@ -123,10 +126,15 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       }
     }
 
+    var startTime = meeting.start_time || "";
+    // optional check/filter if only looking for meetings on the fourth thursday of the month
+    if (ONLY_FOURTH_THURS && !isFourthThursday(startTime)) {
+      return;
+    }
+
+    var endTime = meeting.end_time || "";
     var rawUuid = meeting.meeting_uuid;
     var topic = meeting.topic || "Untitled Meeting";
-    var startTime = meeting.start_time || "";
-    var endTime = meeting.end_time || "";
     var duration = meeting.duration || 0;
     var hostDisplayName = meeting.host_display_name || "";
     var hostEmail = meeting.host_email || "";
@@ -268,6 +276,18 @@ function getParticipants(inFrom = FROM, inTo = TO) {
   });
 }
 
+
+// check if the input ISO is the 4th thursday in the month
+function isFourthThursday(isoDate) {
+  const date = new Date(isoDate);
+  // Check if the day is Thursday (4)
+  if (date.getDay() !== 4) {
+    return false;
+  }
+  const dayOfMonth = date.getDate();
+  // Check if the date is between 22 and 28
+  return dayOfMonth >= 22 && dayOfMonth <= 28;
+}
 
 // converts a string representing minutes into hours, minutes
 function minutesToHM(minutes) {
