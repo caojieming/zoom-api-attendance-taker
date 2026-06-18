@@ -29,8 +29,8 @@ const MEETING_ID = "";
 // toggle to include only 4th thursdays of the month
 const ONLY_FOURTH_THURS = true;
 
-// toggle to include or not include notetakers
-const INCLUDE_NOTETAKERS = false;
+// toggle to exclude notetakers
+const EXCLUDE_NOTETAKERS = true;
 
 
 
@@ -139,7 +139,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     var hostDisplayName = meeting.host_display_name || "";
     var hostEmail = meeting.host_email || "";
     // var totalParticipantsCount = meeting.participants;
-    // will manually count totalParticipantsCount later, this is important if we disable INCLUDE_NOTETAKERS
+    // will manually count totalParticipantsCount later, this is important if we enable EXCLUDE_NOTETAKERS
 
     // Format sheet name: MM/DD/YYYY, Topic
     // var dateString = formatMeetingDate(startTime);
@@ -194,7 +194,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     var sanitizedParticipants = [];
     participants.forEach(function (p) {
       // skip cases
-      if (!INCLUDE_NOTETAKERS && p.name.toString().toLowerCase().includes("notetaker")) {
+      if (EXCLUDE_NOTETAKERS && p.name.toString().toLowerCase().includes("notetaker")) {
         return;
       }
 
