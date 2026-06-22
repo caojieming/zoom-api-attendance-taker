@@ -29,8 +29,8 @@ const MEETING_ID = "";
 // toggle to include only 4th thursdays of the month
 const ONLY_FOURTH_THURS = true;
 
-// toggle to exclude notetakers
-const EXCLUDE_NOTETAKERS = true;
+// if participant name has any of these words, exclude them from the sheet
+const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
 
 
 
@@ -190,16 +190,34 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       }
     } while (participantNextPageToken);
 
-    // sanitize participants list (optionally remove Notetakers)
+    // sanitize participants list (optionally remove Notetakers, merge dupe names)
     var sanitizedParticipants = [];
-    participants.forEach(function (p) {
+    participants.forEach(function (curParticipant) {
       // skip cases
-      if (EXCLUDE_NOTETAKERS && p.name.toString().toLowerCase().includes("notetaker")) {
+      if (PARTICIPANT_BLACKLIST.length > 0 && PARTICIPANT_BLACKLIST.some(keyword => curParticipant.name.toLowerCase().includes(keyword.toLowerCase()))) {
         return;
       }
 
-      totalParticipantsCount++;
-      sanitizedParticipants.push(p);
+      // check for dupes (participant has has left and is rejoining)
+      let dupeMerged = false;
+      sanitizedParticipants.forEach(function (pastParticipant) {
+        // participant is a dupe: merge participant into past participant
+        if (curParticipant.name === pastParticipant.name) {
+          pastParticipant.leave_time = curParticipant.leave_time;
+          pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
+          pastParticipant.timesRejoined += 1;
+          dupeMerged = true;
+          return;
+        }
+      });
+
+      // participant is not a dupe: add as a new entry
+      if (!dupeMerged) {
+        curParticipant.timesRejoined = 0;
+        sanitizedParticipants.push(curParticipant);
+        totalParticipantsCount++;
+      }
+
     });
     var totalParticipantsCount = sanitizedParticipants.length;
 
@@ -238,40 +256,45 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       timeOnly(convertISOTimeZone(endTime))
     ];
 
-    newSheet.getRange(1, 8, 1, detailsHeaders.length).setValues([detailsHeaders]);
-    newSheet.getRange(2, 8, 1, detailsRow.length).setValues([detailsRow]);
 
     // 4. Generate and place the participants table next (starts at column A / 1)
     var participantHeaders = [
-      "id",
+      // "id",
       "name",
-      "user_email",
+      // "user_email",
       "join_time",
       "leave_time",
-      "duration"
+      "duration",
+      "rejoined"
     ];
 
-    newSheet.getRange(1, 1, 1, participantHeaders.length).setValues([participantHeaders]);
+    var participantRows = sanitizedParticipants.map(function (p) {
+      return [
+        // p.id || "",
+        p.name || "",
+        // p.user_email || "",
+        timeOnly(convertISOTimeZone(p.join_time)) || "",
+        timeOnly(convertISOTimeZone(p.leave_time)) || "",
+        secondsToHMS(p.duration) || 0,
+        p.timesRejoined || 0
+      ];
+    });
 
-    if (sanitizedParticipants.length > 0) {
-      var participantRows = sanitizedParticipants.map(function (p) {
-        return [
-          p.id || "",
-          p.name || "",
-          p.user_email || "",
-          timeOnly(convertISOTimeZone(p.join_time)) || "",
-          timeOnly(convertISOTimeZone(p.leave_time)) || "",
-          secondsToHMS(p.duration) || 0
-        ];
-      });
-      newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
-    }
+    // getRange(row, col, num rows, num cols)
+    // set meeting details
+    newSheet.getRange(1, participantHeaders.length + 2, 1, detailsHeaders.length).setValues([detailsHeaders]);
+    newSheet.getRange(2, participantHeaders.length + 2, 1, detailsRow.length).setValues([detailsRow]);
+
+    // set participant details
+    // (row, col, num rows, num cols)
+    newSheet.getRange(1, 1, 1, participantHeaders.length).setValues([participantHeaders]);
+    newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
 
     // auto resize columns
     resizeColumnsToFit(newSheet);
 
     // add a filter to columns A to F
-    newSheet.getRange("A:F").createFilter();
+    newSheet.getRange(1, 1, participantRows.length + 1, participantHeaders.length).createFilter();
 
   });
 }
