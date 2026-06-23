@@ -264,6 +264,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       // "user_email",
       "join_time",
       "leave_time",
+      "duration_sec",
       "duration",
       "rejoined"
     ];
@@ -275,6 +276,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         // p.user_email || "",
         timeOnly(convertISOTimeZone(p.join_time)) || "",
         timeOnly(convertISOTimeZone(p.leave_time)) || "",
+        p.duration || 0,
         secondsToHMS(p.duration) || 0,
         p.timesRejoined || 0
       ];
