@@ -32,6 +32,9 @@ const ONLY_FOURTH_THURS = true;
 // if participant name has any of these words, exclude them from the sheet
 const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
 
+// merge participant entries with exact same name
+const MERGE_DUPES = true;
+
 
 
 // can't get more than 1 month worth of records at a time, need to call multiple times
@@ -193,27 +196,34 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     // sanitize participants list (optionally remove Notetakers, merge dupe names)
     var sanitizedParticipants = [];
     participants.forEach(function (curParticipant) {
-      // skip cases
+      // if any of the blacklist substrings are in the curParticipant name, skip
       if (PARTICIPANT_BLACKLIST.length > 0 && PARTICIPANT_BLACKLIST.some(keyword => curParticipant.name.toLowerCase().includes(keyword.toLowerCase()))) {
         return;
       }
 
-      // check for dupes (participant has has left and is rejoining)
-      let dupeMerged = false;
-      sanitizedParticipants.forEach(function (pastParticipant) {
-        // participant is a dupe: merge participant into past participant
-        if (curParticipant.name === pastParticipant.name) {
-          pastParticipant.leave_time = curParticipant.leave_time;
-          pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
-          pastParticipant.timesRejoined += 1;
-          dupeMerged = true;
-          return;
-        }
-      });
+      if (MERGE_DUPES) {
+        // check for dupes (participant has has left and is rejoining)
+        let dupeMerged = false;
+        sanitizedParticipants.forEach(function (pastParticipant) {
+          // participant is a dupe: merge participant into past participant
+          if (curParticipant.name === pastParticipant.name) {
+            pastParticipant.leave_time = curParticipant.leave_time;
+            pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
+            pastParticipant.timesRejoined += 1;
+            dupeMerged = true;
+            return;
+          }
+        });
 
-      // participant is not a dupe: add as a new entry
-      if (!dupeMerged) {
-        curParticipant.timesRejoined = 0;
+        // participant is not a dupe: add as a new entry
+        if (!dupeMerged) {
+          curParticipant.timesRejoined = 0;
+          sanitizedParticipants.push(curParticipant);
+          totalParticipantsCount++;
+        }
+      }
+      // allow dupes, so just add all participants
+      else {
         sanitizedParticipants.push(curParticipant);
         totalParticipantsCount++;
       }
@@ -278,9 +288,10 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         timeOnly(convertISOTimeZone(p.leave_time)) || "",
         p.duration || 0,
         secondsToHMS(p.duration) || 0,
-        p.timesRejoined || 0
+        MERGE_DUPES ? p.timesRejoined : "disabled"
       ];
     });
+
 
     // getRange(row, col, num rows, num cols)
     // set meeting details
