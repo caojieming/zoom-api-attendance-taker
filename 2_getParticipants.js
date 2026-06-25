@@ -35,6 +35,10 @@ const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
 // merge participant entries with exact same name
 const MERGE_DUPES = true;
 
+// merge similar participant entries within a certain margin of error
+const MERGE_SIMILAR = true;
+const MERGE_SIMILAR_PERCENTAGE = 0.8;
+
 
 
 // can't get more than 1 month worth of records at a time, need to call multiple times
@@ -201,29 +205,40 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         return;
       }
 
-      if (MERGE_DUPES) {
-        // check for dupes (participant has has left and is rejoining)
-        let dupeMerged = false;
+      // dupe checks
+      if (MERGE_DUPES || MERGE_SIMILAR) {
+        let merged = false;
         sanitizedParticipants.forEach(function (pastParticipant) {
           // participant is a dupe: merge participant into past participant
-          if (curParticipant.name === pastParticipant.name) {
+          if (MERGE_DUPES && curParticipant.name === pastParticipant.name) {
             pastParticipant.leave_time = curParticipant.leave_time;
             pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
             pastParticipant.timesRejoined += 1;
-            dupeMerged = true;
+            merged = true;
+            return;
+          }
+          // participant name is MERGE_SIMILAR_PERCENTAGE (currently 80%) similar to a previous participant name
+          if (MERGE_SIMILAR && stringSimilarity(curParticipant.name, pastParticipant.name) >= MERGE_SIMILAR_PERCENTAGE) {
+            pastParticipant.name = curParticipant.name;
+            pastParticipant.leave_time = curParticipant.leave_time;
+            pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
+            pastParticipant.timesRejoined += 1;
+            merged = true;
             return;
           }
         });
 
         // participant is not a dupe: add as a new entry
-        if (!dupeMerged) {
+        if (!merged) {
           curParticipant.timesRejoined = 0;
           sanitizedParticipants.push(curParticipant);
           totalParticipantsCount++;
         }
       }
-      // allow dupes, so just add all participants
+      // allow any dupes, so just add participant
       else {
+        // neither merge toggle enabled, so just set timesRejoined = "disabled"
+        curParticipant.timesRejoined = "disabled";
         sanitizedParticipants.push(curParticipant);
         totalParticipantsCount++;
       }
@@ -288,7 +303,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         timeOnly(convertISOTimeZone(p.leave_time)) || "",
         p.duration || 0,
         secondsToHMS(p.duration) || 0,
-        MERGE_DUPES ? p.timesRejoined : "disabled"
+        p.timesRejoined
       ];
     });
 
@@ -313,6 +328,50 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 }
 
 
+
+// function that returns the decimal/percentage similarity between 2 strings (example: 0.9 = 90% similarity between 2 strings)
+// NOTE: don't know if I'll actually use this, I might just stick with checking if editDistance <= 2 or smth similar
+function stringSimilarity(s1, s2) {
+  var longer = s1;
+  var shorter = s2;
+  if (s1.length < s2.length) {
+    longer = s2;
+    shorter = s1;
+  }
+  var longerLength = longer.length;
+  if (longerLength == 0) {
+    return 1.0;
+  }
+  return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+}
+// function that returns the Levenshtein distance of 2 strings (aka the # of edits needed to make string1 into string2)
+function editDistance(s1, s2) {
+  s1 = s1.toLowerCase();
+  s2 = s2.toLowerCase();
+
+  var costs = new Array();
+  for (var i = 0; i <= s1.length; i++) {
+    var lastValue = i;
+    for (var j = 0; j <= s2.length; j++) {
+      if (i == 0)
+        costs[j] = j;
+      else {
+        if (j > 0) {
+          var newValue = costs[j - 1];
+          if (s1.charAt(i - 1) != s2.charAt(j - 1))
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+    }
+    if (i > 0)
+      costs[s2.length] = lastValue;
+  }
+  return costs[s2.length];
+}
+
+
 // check if the input ISO is the 4th thursday in the month
 function isFourthThursday(isoDate) {
   const date = new Date(isoDate);
@@ -324,6 +383,7 @@ function isFourthThursday(isoDate) {
   // Check if the date is between 22 and 28
   return dayOfMonth >= 22 && dayOfMonth <= 28;
 }
+
 
 // converts a string representing minutes into hours, minutes
 function minutesToHM(minutes) {
@@ -346,6 +406,7 @@ function secondsToHMS(seconds) {
   return `${h}h ${m}m ${s}s`;
 }
 
+
 // simple func that takes in a sheet and auto resizes all columns that contain values
 function resizeColumnsToFit(sheet) {
   const dataRange = sheet.getDataRange();
@@ -353,6 +414,7 @@ function resizeColumnsToFit(sheet) {
     sheet.autoResizeColumns(1, dataRange.getNumColumns());
   }
 }
+
 
 /**
  * Formats an ISO 8601 date string to MM/DD/YYYY format.
@@ -400,6 +462,7 @@ function timeOnly(datetime) {
   const time = datetime.slice(i + 1);
   return time;
 }
+
 
 /**
  * Prepares the Zoom Meeting UUID for use in URL paths, applying double-encoding
