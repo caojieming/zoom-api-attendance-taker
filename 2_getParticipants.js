@@ -13,7 +13,7 @@ const SIX_MONTHS_AGO = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOStr
 
 // request constants, these are sent to Zoom API as part of the request
 // time period of past meetings to GET
-const FROM = SIX_MONTHS_AGO;
+const FROM = ONE_MONTH_AGO;
 const TO = NOW;
 // Type of meeting (meeting or webinar, can also send "" for both)
 const MEETING_TYPE = "meeting";
@@ -105,7 +105,6 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     }
   } while (nextMeetingPageToken);
 
-  // console.log(meetings);
 
   // Filter for unique meetings based on UUID
   var uniqueMeetings = [];
@@ -117,25 +116,20 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     }
   });
 
-  // console.log(uniqueMeetings);
-  // console.log(seenUuids);
 
   // 2. Iterate through each unique meeting and build the spreadsheets
   uniqueMeetings.forEach(function (meeting) {
     var meetingId = meeting.meeting_id;
 
     // optional check/filter for meeting ID
-    // if const MEETING_ID is filled/is not empty
-    if (MEETING_ID !== "") {
-      // if current meeting ID does not equal const MEETING_ID, skip (note, use soft inequality check: meetingId is apparently not a string)
-      if (meetingId != MEETING_ID) {
-        return;
-      }
+    // if const MEETING_ID is filled/is not empty AND current meeting ID does not equal const MEETING_ID (note, use soft inequality check: meetingId is apparently not a string)
+    if(MEETING_ID !== "" && meetingId != MEETING_ID) {
+      return;
     }
 
     var startTime = meeting.start_time || "";
     // optional check/filter if only looking for meetings on the fourth thursday of the month
-    if (ONLY_FOURTH_THURS && !isFourthThursday(startTime)) {
+    if(ONLY_FOURTH_THURS && !isFourthThursday(startTime)) {
       return;
     }
 
@@ -148,14 +142,8 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     // var totalParticipantsCount = meeting.participants;
     // will manually count totalParticipantsCount later, this is important if we enable EXCLUDE_NOTETAKERS
 
-    // Format sheet name: MM/DD/YYYY, Topic
-    // var dateString = formatMeetingDate(startTime);
-    // var sanitizedTopic = topic.replace(/[\\?\*:\[\]]/g, "-"); // Replace forbidden sheet characters
-    // var sheetName = convertISOTimeZone(startTime) + ", " + sanitizedTopic;
+    // Format sheet name: MM/DD/YYYY, HH:mm:ss am/pm
     var sheetName = convertISOTimeZone(startTime);
-    if (sheetName.length > 50) {
-      sheetName = sheetName.substring(0, 50) + "...";
-    }
 
     // Skip if a sheet with this name already exists
     if (ss.getSheetByName(sheetName)) {
@@ -201,16 +189,16 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     var sanitizedParticipants = [];
     participants.forEach(function (curParticipant) {
       // if any of the blacklist substrings are in the curParticipant name, skip
-      if (PARTICIPANT_BLACKLIST.length > 0 && PARTICIPANT_BLACKLIST.some(keyword => curParticipant.name.toLowerCase().includes(keyword.toLowerCase()))) {
+      if(PARTICIPANT_BLACKLIST.length > 0 && PARTICIPANT_BLACKLIST.some(keyword => curParticipant.name.toLowerCase().includes(keyword.toLowerCase()))) {
         return;
       }
 
       // dupe checks
-      if (MERGE_DUPES || MERGE_SIMILAR) {
+      if(MERGE_DUPES || MERGE_SIMILAR){
         let merged = false;
-        sanitizedParticipants.forEach(function (pastParticipant) {
+        sanitizedParticipants.forEach(function (pastParticipant){
           // participant is a dupe: merge participant into past participant
-          if (MERGE_DUPES && curParticipant.name === pastParticipant.name) {
+          if(MERGE_DUPES && curParticipant.name === pastParticipant.name) {
             pastParticipant.leave_time = curParticipant.leave_time;
             pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
             pastParticipant.timesRejoined += 1;
@@ -218,7 +206,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
             return;
           }
           // participant name is MERGE_SIMILAR_PERCENTAGE (currently 80%) similar to a previous participant name
-          if (MERGE_SIMILAR && stringSimilarity(curParticipant.name, pastParticipant.name) >= MERGE_SIMILAR_PERCENTAGE) {
+          if(MERGE_SIMILAR && stringSimilarity(curParticipant.name, pastParticipant.name) >= MERGE_SIMILAR_PERCENTAGE) {
             pastParticipant.name = curParticipant.name;
             pastParticipant.leave_time = curParticipant.leave_time;
             pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
@@ -229,7 +217,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         });
 
         // participant is not a dupe: add as a new entry
-        if (!merged) {
+        if(!merged) {
           curParticipant.timesRejoined = 0;
           sanitizedParticipants.push(curParticipant);
           totalParticipantsCount++;
@@ -246,9 +234,9 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     });
     var totalParticipantsCount = sanitizedParticipants.length;
 
-    // if totalParticipantsCount = 0, then all participants were notetakers: skip this meeting
+    // if totalParticipantsCount = 0, then all participants were blacklisted: skip this meeting
     // if totalParticipantsCount = 1, then it can hardly by called a meeting: skip this meeting
-    if (totalParticipantsCount <= 1) {
+    if(totalParticipantsCount <= 1) {
       return;
     }
 
@@ -330,7 +318,6 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
 
 // function that returns the decimal/percentage similarity between 2 strings (example: 0.9 = 90% similarity between 2 strings)
-// NOTE: don't know if I'll actually use this, I might just stick with checking if editDistance <= 2 or smth similar
 function stringSimilarity(s1, s2) {
   var longer = s1;
   var shorter = s2;
@@ -417,35 +404,15 @@ function resizeColumnsToFit(sheet) {
 
 
 /**
- * Formats an ISO 8601 date string to MM/DD/YYYY format.
- * @param {string} dateStr - The ISO date string.
- * @returns {string} The formatted date string.
- */
-function formatMeetingDate(dateStr) {
-  if (!dateStr) return "";
-  var date = new Date(dateStr);
-  try {
-    return Utilities.formatDate(date, Session.getScriptTimeZone(), "MM/dd/yyyy");
-  } catch (e) {
-    var month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    var day = String(date.getUTCDate()).padStart(2, '0');
-    var year = date.getUTCFullYear();
-    return month + "/" + day + "/" + year;
-  }
-}
-
-/**
  * Converts input ISO 8601 (UTC) string into a specified locale string (default PT)
  * iso format: '2023-06-08T18:30:00Z'
  * newTimeZone format: 'America/Los_Angeles'
  */
 function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
   const dt = new Date(iso);
-  const converted = dt.toLocaleString('en-US', {
-    timeZone: newTimeZone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
-  });
+  const converted = dt.toLocaleString('en-US', { timeZone: newTimeZone,
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: true });
   return converted; // e.g. "06/08/2023, 11:30:00 AM"
 }
 
