@@ -106,19 +106,9 @@ function getParticipants(inFrom = FROM, inTo = TO) {
   } while (nextMeetingPageToken);
 
 
-  // Filter for unique meetings based on UUID
-  var uniqueMeetings = [];
-  var seenUuids = new Set();
+  // Filter for wanted meetings
+  var filteredMeetings = [];
   meetings.forEach(function (meeting) {
-    if (meeting.meeting_uuid && !seenUuids.has(meeting.meeting_uuid)) {
-      seenUuids.add(meeting.meeting_uuid);
-      uniqueMeetings.push(meeting);
-    }
-  });
-
-
-  // 2. Iterate through each unique meeting and build the spreadsheets
-  uniqueMeetings.forEach(function (meeting) {
     var meetingId = meeting.meeting_id;
 
     // optional check/filter for meeting ID
@@ -133,6 +123,15 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       return;
     }
 
+    // passed all filters, add meeting to filteredMeetings list
+    filteredMeetings.push(meeting);
+  });
+
+
+  // 2. Iterate through each meeting and build the spreadsheets
+  filteredMeetings.forEach(function (meeting) {
+    var meetingId = meeting.meeting_id;
+    var startTime = meeting.start_time || "";
     var endTime = meeting.end_time || "";
     var rawUuid = meeting.meeting_uuid;
     var topic = meeting.topic || "Untitled Meeting";
@@ -140,7 +139,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     var hostDisplayName = meeting.host_display_name || "";
     var hostEmail = meeting.host_email || "";
     // var totalParticipantsCount = meeting.participants;
-    // will manually count totalParticipantsCount later, this is important if we enable EXCLUDE_NOTETAKERS
+    // will manually count totalParticipantsCount later, this is important if we enable PARTICIPANT_BLACKLIST
 
     // Format sheet name: MM/DD/YYYY, HH:mm:ss am/pm
     var sheetName = convertISOTimeZone(startTime);
