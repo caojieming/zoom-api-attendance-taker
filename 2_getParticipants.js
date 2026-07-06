@@ -1,14 +1,14 @@
 // helper constants used for setting FROM and TO times
 const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
-const ONE_DAY_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const THREE_DAYS_AGO = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const ONE_WEEK_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // One week ago (YYYY-MM-DD)
-const ONE_MONTH_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const TWO_MONTHS_AGO = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const THREE_MONTHS_AGO = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const FOUR_MONTHS_AGO = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const FIVE_MONTHS_AGO = new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-const SIX_MONTHS_AGO = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+const ONE_DAY_AGO = daysAgo(1);
+const THREE_DAYS_AGO = daysAgo(3);
+const ONE_WEEK_AGO = daysAgo(7);
+const ONE_MONTH_AGO = daysAgo(30);
+const TWO_MONTHS_AGO = daysAgo(60);
+const THREE_MONTHS_AGO = daysAgo(90);
+const FOUR_MONTHS_AGO = daysAgo(120);
+const FIVE_MONTHS_AGO = daysAgo(150);
+const SIX_MONTHS_AGO = daysAgo(180);
 
 
 // request constants, these are sent to Zoom API as part of the request
@@ -442,4 +442,10 @@ function prepareUuid(uuid) {
     return encodeURIComponent(encodeURIComponent(uuid));
   }
   return encodeURIComponent(uuid);
+}
+
+
+// a simple function to get the datetime "days" ago
+function daysAgo(days) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
