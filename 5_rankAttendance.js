@@ -6,8 +6,8 @@ function rankAttendance() {
   const activeSheet = ss.getActiveSheet();
   const activeIndex = sheets.findIndex(sh => sh.getSheetId() === activeSheet.getSheetId());
 
-  // Match start-of-string: MM/DD/YYYY (allow M/D too), then anything after (time, etc.)
-  const startDateRe = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+  // Match start-of-string: YYYY/MM/DD, then anything after (time, etc.)
+  const startDateRe = /^(\d{4})\/(\d{2})\/(\d{2})/;
 
   // 1) Sheets to the right of active whose names start with a date
   const eligible = [];
