@@ -3,7 +3,7 @@ function sortRecords() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetsInOrder = ss.getSheets(); // current left-to-right order
 
-  const dateRegex = /^\d{2}\/\d{2}\/\d{4}/; // starts with MM/DD/YYYY
+  const dateRegex = /^(\d{4})\/(\d{2})\/(\d{2})/; // starts with YYYY/MM/DD
 
   // Keep everything before the first matching (non-date) sheet in place.
   const firstValidIdx = sheetsInOrder.findIndex(s => dateRegex.test(s.getName()));

@@ -80,6 +80,9 @@ function rankAttendance() {
   rankedSheet.getRange(1, 1, 1, header.length).setValues([header]);
   if (rows.length) rankedSheet.getRange(2, 1, rows.length, header.length).setValues(rows);
 
+  // add a filter to all columns
+  rankedSheet.getRange(1, 1, rows.length + 1, header.length).createFilter();
+
   // auto resize columns
   resizeColumnsToFit(rankedSheet);
 }
