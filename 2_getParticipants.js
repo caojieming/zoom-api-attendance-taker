@@ -184,11 +184,20 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       }
     } while (participantNextPageToken);
 
-    // sanitize participants list (optionally remove Notetakers, merge dupe names)
+    // sanitize participants list (optionally remove Notetakers, remove chapter names, merge dupe names)
     var sanitizedParticipants = [];
     participants.forEach(function (curParticipant) {
       // if any of the blacklist substrings are in the curParticipant name, skip
       if(PARTICIPANT_BLACKLIST.length > 0 && PARTICIPANT_BLACKLIST.some(keyword => curParticipant.name.toLowerCase().includes(keyword.toLowerCase()))) {
+        return;
+      }
+
+      // remove chapter names or other similar extra non-useful info in name
+      curParticipant.name = curParticipant.name.split(" - ")[0].trim();
+      curParticipant.name = curParticipant.name.split(" (")[0].trim();
+      curParticipant.name = curParticipant.name.split("iPhone")[0].trim();
+      if(curParticipant.name === '') {
+        // after trimming, empty string -> no useful info, so skip
         return;
       }
 
