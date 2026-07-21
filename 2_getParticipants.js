@@ -29,6 +29,9 @@ const MEETING_ID = "";
 // toggle to include only 4th thursdays of the month
 const ONLY_FOURTH_THURS = true;
 
+// if participant name has any of these phrases, cut off everything from this point onwards (including the phrase)
+const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone"];
+
 // if participant name has any of these words, exclude them from the sheet
 const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
 
@@ -68,17 +71,17 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
   // 1. Paginated fetch of past meetings from the Zoom report API
   do {
-    var url = "https://api.zoom.us/v2" + "/report/history_meetings" +
+    var meetingsUrl = "https://api.zoom.us/v2/report/history_meetings" +
       "?from=" + inFrom +
       "&to=" + inTo +
       "&page_size=" + PAGE_SIZE +
       "&meeting_type=" + MEETING_TYPE;
 
     if (SEARCH_KEY) {
-      url += "&search_key=" + encodeURIComponent(SEARCH_KEY);
+      meetingsUrl += "&search_key=" + encodeURIComponent(SEARCH_KEY);
     }
     if (nextMeetingPageToken) {
-      url += "&next_page_token=" + encodeURIComponent(nextMeetingPageToken);
+      meetingsUrl += "&next_page_token=" + encodeURIComponent(nextMeetingPageToken);
     }
 
     var options = {
@@ -89,7 +92,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       muteHttpExceptions: true
     };
 
-    var response = UrlFetchApp.fetch(url, options);
+    var response = UrlFetchApp.fetch(meetingsUrl, options);
     var responseCode = response.getResponseCode();
 
     if (responseCode === 200) {
@@ -156,9 +159,12 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     var encodedUuid = prepareUuid(rawUuid);
 
     do {
-      var partUrl = "https://api.zoom.us/v2/past_meetings/" + encodedUuid + "/participants?page_size=300";
+      // don't bother with much with page_size here as it's much less likely to hit rate limits than meetings
+      var participantsUrl = `https://api.zoom.us/v2/past_meetings/${encodedUuid}/participants` +
+        "?page_size=" + 300;
+
       if (participantNextPageToken) {
-        partUrl += "&next_page_token=" + encodeURIComponent(participantNextPageToken);
+        participantsUrl += "&next_page_token=" + encodeURIComponent(participantNextPageToken);
       }
 
       var partOptions = {
@@ -169,7 +175,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         muteHttpExceptions: true
       };
 
-      var partResponse = UrlFetchApp.fetch(partUrl, partOptions);
+      var partResponse = UrlFetchApp.fetch(participantsUrl, partOptions);
       var partResponseCode = partResponse.getResponseCode();
 
       if (partResponseCode === 200) {
@@ -193,9 +199,9 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       }
 
       // remove chapter names or other similar extra non-useful info in name
-      curParticipant.name = curParticipant.name.split(" - ")[0].trim();
-      curParticipant.name = curParticipant.name.split(" (")[0].trim();
-      curParticipant.name = curParticipant.name.split("iPhone")[0].trim();
+      PARTICIPANT_DELIMITERS.forEach(function (delimiter) {
+        curParticipant.name = curParticipant.name.split(delimiter)[0].trim();
+      });
       if(curParticipant.name === '') {
         // after trimming, empty string -> no useful info, so skip
         return;
