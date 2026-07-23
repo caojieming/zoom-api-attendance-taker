@@ -120,6 +120,11 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       return;
     }
 
+    // skip false/empty meetings (I assume meetings comprised of 5 or less total participants aren't meetings we're interested in)
+    if(Number(meeting.participants) <= 5) {
+      return;
+    }
+
     var startTime = meeting.start_time || "";
     // optional check/filter if only looking for meetings on the fourth thursday of the month
     if(ONLY_FOURTH_THURS && !isFourthThursday(startTime)) {
@@ -134,8 +139,8 @@ function getParticipants(inFrom = FROM, inTo = TO) {
   // 2. Iterate through each meeting and build the spreadsheets
   filteredMeetings.forEach(function (meeting) {
     var meetingId = meeting.meeting_id;
-    var startTime = meeting.start_time || "";
-    var endTime = meeting.end_time || "";
+    var startTime = convertPlainToISO(meeting.start_time) || "";
+    var endTime = convertPlainToISO(meeting.end_time) || "";
     var rawUuid = meeting.meeting_uuid;
     var topic = meeting.topic || "Untitled Meeting";
     var duration = meeting.duration || 0;
@@ -253,7 +258,6 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     if(totalParticipantsCount <= 1) {
       return;
     }
-
 
     // Insert new sheet for the meeting
     var newSheet = ss.insertSheet(sheetName);
@@ -418,7 +422,18 @@ function resizeColumnsToFit(sheet) {
 
 
 /**
- * Converts input ISO 8601 (UTC) string into a specified locale string (default PT)
+ * a function that is apparently needed: converts plain datetime format into ISO 8601
+ * example:
+ * input: 2026-07-23 17:51:22
+ * output: 2026-07-23T17:51:22Z
+ */
+function convertPlainToISO(plainDT) {
+  var iso = plainDT.trim().replace(' ', 'T');
+  iso += 'Z';
+  return iso;
+}
+/**
+ * Converts input ISO 8601 (UTC) string into a specified locale string (defaulting to PT)
  * iso format: '2023-06-08T18:30:00Z'
  * newTimeZone format: 'America/Los_Angeles'
  */
