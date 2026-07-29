@@ -23,14 +23,12 @@ const SEARCH_KEY = "";
 const PAGE_SIZE = 200;
 
 
-// extra constants, used for misc filtering
-const MEETING_ID = "";
-
-// toggle to include only 4th thursdays of the month
+/* Extra filters */
+// toggle to include only meetings that occurr on 4th thursdays of the month
 const ONLY_FOURTH_THURS = true;
 
 // if participant name has any of these phrases, cut off everything from this point onwards (including the phrase)
-const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone"];
+const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone", " | ", " SoCal", ", ", ": "];
 
 // if participant name has any of these words, exclude them from the sheet
 const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
