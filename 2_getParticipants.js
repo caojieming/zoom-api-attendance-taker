@@ -257,8 +257,27 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       return;
     }
 
+
+    // make sure to only insert sheets after [Base] and Ranked Attendance and before other attendance sheets
+    const datePrefix = /^\d{4}\/\d{2}\/\d{2}/;
+    while (true) {
+      const sheets = ss.getSheets();
+      const activeSheet = ss.getActiveSheet();
+      const activeIndex = activeSheet.getIndex(); // 1-based
+
+      if (activeIndex >= sheets.length) break; // already last sheet
+
+      const rightSheet = sheets[activeIndex]; // directly to the right
+      const rightName = rightSheet.getName();
+
+      if (datePrefix.test(rightName)) break;
+
+      rightSheet.activate();
+    }
+
     // Insert new sheet for the meeting
     var newSheet = ss.insertSheet(sheetName);
+    
 
     // 3. Generate and place the meeting details table first (starts at column H / 8)
     var detailsHeaders = [
@@ -293,7 +312,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       // "user_email",
       "join_time",
       "leave_time",
-      "duration_sec",
+      // "duration_sec",
       "duration",
       "rejoined"
     ];
@@ -305,7 +324,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         // p.user_email || "",
         timeOnly(convertISOTimeZone(p.join_time)) || "",
         timeOnly(convertISOTimeZone(p.leave_time)) || "",
-        p.duration || 0,
+        // p.duration || 0,
         secondsToHMS(p.duration) || 0,
         p.timesRejoined
       ];
@@ -398,15 +417,17 @@ function minutesToHM(minutes) {
   return `${h}h ${m}m`;
 }
 
-// converts a string representing seconds into hours, minutes, seconds, format: "0h 0m 0s"
+// converts a string representing seconds into hours, minutes, seconds, format: "00h 00m 00s"
 function secondsToHMS(seconds) {
   const n = parseFloat(seconds);
-  if (!isFinite(n)) return '0h 0m 0s';
+  if (!isFinite(n)) return '00h 00m 00s';
   const total = Math.floor(Math.abs(n));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
-  return `${h}h ${m}m ${s}s`;
+
+  const pad = (v) => String(v).padStart(2, '0');
+  return `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
 }
 
 

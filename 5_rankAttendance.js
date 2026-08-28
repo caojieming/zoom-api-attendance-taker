@@ -5,7 +5,7 @@ function rankAttendance() {
   const sheets = ss.getSheets();
 
   const activeSheet = ss.getActiveSheet();
-  const activeIndex = sheets.findIndex(sh => sh.getSheetId() === activeSheet.getSheetId());
+  const activeIndex = activeSheet.getIndex();
 
   // Match start-of-string: YYYY/MM/DD, then anything after (time, etc.)
   const startDateRe = /^(\d{4})\/(\d{2})\/(\d{2})/;
@@ -98,6 +98,8 @@ function rankAttendance() {
   const existing = ss.getSheetByName("Ranked Attendance");
   if (existing) ss.deleteSheet(existing);
   const rankedSheet = ss.insertSheet("Ranked Attendance");
+  // google sheets is 1 indexed, this ensures that rankedSheet will be the 2nd sheet
+  ss.moveActiveSheet(2);
 
   const header = ["name", "rate", ...dates];
 
