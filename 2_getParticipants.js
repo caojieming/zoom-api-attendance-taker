@@ -28,7 +28,10 @@ const PAGE_SIZE = 200;
 const ONLY_FOURTH_THURS = true;
 
 // if participant name has any of these phrases, cut off everything from this point onwards (including the phrase)
-const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone", " | ", " SoCal", ", ", ": "];
+const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone", " | ", " SoCal", ", ", ": ", " SaaS ", "’s iPad"];
+
+// if participant name is less than this length, exclude them
+const PARTICIPANT_MIN_NAME_LENGTH = 2;
 
 // if participant name has any of these words, exclude them from the sheet
 const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
@@ -207,6 +210,11 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       });
       if(curParticipant.name === '') {
         // after trimming, empty string -> no useful info, so skip
+        return;
+      }
+
+      // remove names that are of a certain length or shorter
+      if(curParticipant.name.length < PARTICIPANT_MIN_NAME_LENGTH) {
         return;
       }
 
@@ -480,7 +488,7 @@ function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
   const second = get('second');
   const dayPeriod = get('dayPeriod'); // AM/PM
 
-  return `${year}/${month}/${day}, ${hour}:${minute}:${second} ${dayPeriod}`;
+  return `${year}-${month}-${day}, ${hour}:${minute}:${second} ${dayPeriod}`;
 }
 
 // intended to be used after convertISOTimeZone(), returns only the date

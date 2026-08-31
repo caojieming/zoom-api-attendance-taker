@@ -7,8 +7,8 @@ function rankAttendance() {
   const activeSheet = ss.getActiveSheet();
   const activeIndex = activeSheet.getIndex();
 
-  // Match start-of-string: YYYY/MM/DD, then anything after (time, etc.)
-  const startDateRe = /^(\d{4})\/(\d{2})\/(\d{2})/;
+  // Match start-of-string: YYYY-MM-DD, then anything after (time, etc.)
+  const startDateRe = /^(\d{4})-(\d{2})-(\d{2})/;
 
   // 1) Sheets to the right of active whose names start with a date
   const meetingSheets = [];
@@ -18,7 +18,7 @@ function rankAttendance() {
     if (startDateRe.test(nm)) meetingSheets.push(sheets[i]);
   }
 
-  // Date label is the matching prefix only (MM/DD/YYYY)
+  // Date label is the matching prefix only (YYYY-MM-DD)
   const dates = meetingSheets.map(sh => {
     const m = sh.getName().trim().match(startDateRe);
     return m ? m[0] : sh.getName().trim();
