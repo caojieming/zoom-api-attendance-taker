@@ -64,15 +64,15 @@ function getParticipantsHalfYear() {
  */
 function getParticipants(inFrom = FROM, inTo = TO) {
   // Fetch access token using existing client function (assumed to be defined globally)
-  var accessToken = getZoomAccessToken();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  const accessToken = getZoomAccessToken();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var meetings = [];
-  var nextMeetingPageToken = "";
+  let meetings = [];
+  let nextMeetingPageToken = "";
 
   // 1. Paginated fetch of past meetings from the Zoom report API
   do {
-    var meetingsUrl = "https://api.zoom.us/v2/report/history_meetings" +
+    let meetingsUrl = "https://api.zoom.us/v2/report/history_meetings" +
       "?from=" + inFrom +
       "&to=" + inTo +
       "&page_size=" + PAGE_SIZE +
@@ -85,7 +85,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       meetingsUrl += "&next_page_token=" + encodeURIComponent(nextMeetingPageToken);
     }
 
-    var options = {
+    const options = {
       method: "get",
       headers: {
         "Authorization": "Bearer " + accessToken
@@ -93,11 +93,11 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       muteHttpExceptions: true
     };
 
-    var response = UrlFetchApp.fetch(meetingsUrl, options);
-    var responseCode = response.getResponseCode();
+    const response = UrlFetchApp.fetch(meetingsUrl, options);
+    const responseCode = response.getResponseCode();
 
     if (responseCode === 200) {
-      var data = JSON.parse(response.getContentText());
+      const data = JSON.parse(response.getContentText());
       // console.log(data);
       if (data.history_meetings && data.history_meetings.length > 0) {
         meetings = meetings.concat(data.history_meetings);
@@ -111,9 +111,9 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
 
   // Filter for wanted meetings
-  var filteredMeetings = [];
+  const filteredMeetings = [];
   meetings.forEach(function (meeting) {
-    var meetingId = meeting.meeting_id;
+    const meetingId = meeting.meeting_id;
 
     // optional check/filter for meeting ID
     // if const MEETING_ID is filled/is not empty AND current meeting ID does not equal const MEETING_ID (note, use soft inequality check: meetingId is apparently not a string)
@@ -126,7 +126,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       return;
     }
 
-    var startTime = meeting.start_time || "";
+    const startTime = meeting.start_time || "";
     // optional check/filter if only looking for meetings on the fourth thursday of the month
     if(ONLY_FOURTH_THURS && !isFourthThursday(startTime)) {
       return;
@@ -139,19 +139,20 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
   // 2. Iterate through each meeting and build the spreadsheets
   filteredMeetings.forEach(function (meeting) {
-    var meetingId = meeting.meeting_id;
-    var startTime = convertPlainToISO(meeting.start_time) || "";
-    var endTime = convertPlainToISO(meeting.end_time) || "";
-    var rawUuid = meeting.meeting_uuid;
-    var topic = meeting.topic || "Untitled Meeting";
-    var duration = meeting.duration || 0;
-    var hostDisplayName = meeting.host_display_name || "";
-    var hostEmail = meeting.host_email || "";
-    // var totalParticipantsCount = meeting.participants;
-    // will manually count totalParticipantsCount later, this is important if we enable PARTICIPANT_BLACKLIST
+    const meetingId = meeting.meeting_id;
+    const startTime = convertPlainToISO(meeting.start_time) || "";
+    const endTime = convertPlainToISO(meeting.end_time) || "";
+    const rawUuid = meeting.meeting_uuid;
+    const topic = meeting.topic || "Untitled Meeting";
+    const duration = meeting.duration || 0;
+    const hostDisplayName = meeting.host_display_name || "";
+    const hostEmail = meeting.host_email || "";
 
-    // Format sheet name: MM/DD/YYYY, HH:mm:ss am/pm
-    var sheetName = convertISOTimeZone(startTime);
+    const convertedStartTime = convertISOTimeZone(startTime);
+    const convertedEndTime = convertISOTimeZone(endTime);
+
+    // Format sheet name: YYYY-MM-DD, HH:mm:ss am/pm
+    const sheetName = convertedStartTime;
 
     // Skip if a sheet with this name already exists
     if (ss.getSheetByName(sheetName)) {
@@ -160,20 +161,20 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     }
 
     // Fetch all participants for this meeting UUID
-    var participants = [];
-    var participantNextPageToken = "";
-    var encodedUuid = prepareUuid(rawUuid);
+    let participants = [];
+    let participantNextPageToken = "";
+    const encodedUuid = prepareUuid(rawUuid);
 
     do {
       // don't bother with much with page_size here as it's much less likely to hit rate limits than meetings
-      var participantsUrl = `https://api.zoom.us/v2/past_meetings/${encodedUuid}/participants` +
+      let participantsUrl = `https://api.zoom.us/v2/past_meetings/${encodedUuid}/participants` +
         "?page_size=" + 300;
 
       if (participantNextPageToken) {
         participantsUrl += "&next_page_token=" + encodeURIComponent(participantNextPageToken);
       }
 
-      var partOptions = {
+      const partOptions = {
         method: "get",
         headers: {
           "Authorization": "Bearer " + accessToken
@@ -181,11 +182,11 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         muteHttpExceptions: true
       };
 
-      var partResponse = UrlFetchApp.fetch(participantsUrl, partOptions);
-      var partResponseCode = partResponse.getResponseCode();
+      const partResponse = UrlFetchApp.fetch(participantsUrl, partOptions);
+      const partResponseCode = partResponse.getResponseCode();
 
       if (partResponseCode === 200) {
-        var partData = JSON.parse(partResponse.getContentText());
+        const partData = JSON.parse(partResponse.getContentText());
         if (partData.participants && partData.participants.length > 0) {
           participants = participants.concat(partData.participants);
         }
@@ -197,7 +198,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     } while (participantNextPageToken);
 
     // sanitize participants list (optionally remove Notetakers, remove chapter names, merge dupe names)
-    var sanitizedParticipants = [];
+    const sanitizedParticipants = [];
     participants.forEach(function (curParticipant) {
       // if any of the blacklist substrings are in the curParticipant name, skip
       if(PARTICIPANT_BLACKLIST.length > 0 && PARTICIPANT_BLACKLIST.some(keyword => curParticipant.name.toLowerCase().includes(keyword.toLowerCase()))) {
@@ -220,32 +221,30 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
       // dupe checks
       if(MERGE_DUPES || MERGE_SIMILAR){
+
         let merged = false;
-        sanitizedParticipants.forEach(function (pastParticipant){
-          // participant is a dupe: merge participant into past participant
-          if(MERGE_DUPES && curParticipant.name === pastParticipant.name) {
+        for (const pastParticipant of sanitizedParticipants) {
+          if (MERGE_DUPES && curParticipant.name === pastParticipant.name) {
             pastParticipant.leave_time = curParticipant.leave_time;
-            pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
+            pastParticipant.duration += curParticipant.duration;
             pastParticipant.timesRejoined += 1;
             merged = true;
-            return;
+            break;
           }
-          // participant name is MERGE_SIMILAR_PERCENTAGE (currently 80%) similar to a previous participant name
-          if(MERGE_SIMILAR && stringSimilarity(curParticipant.name, pastParticipant.name) >= MERGE_SIMILAR_PERCENTAGE) {
+
+          if (MERGE_SIMILAR && stringSimilarity(curParticipant.name, pastParticipant.name) >= MERGE_SIMILAR_PERCENTAGE) {
             pastParticipant.name = curParticipant.name;
             pastParticipant.leave_time = curParticipant.leave_time;
-            pastParticipant.duration = pastParticipant.duration + curParticipant.duration;
+            pastParticipant.duration += curParticipant.duration;
             pastParticipant.timesRejoined += 1;
             merged = true;
-            return;
+            break;
           }
-        });
+        }
 
-        // participant is not a dupe: add as a new entry
-        if(!merged) {
+        if (!merged) {
           curParticipant.timesRejoined = 0;
           sanitizedParticipants.push(curParticipant);
-          totalParticipantsCount++;
         }
       }
       // allow any dupes, so just add participant
@@ -253,11 +252,10 @@ function getParticipants(inFrom = FROM, inTo = TO) {
         // neither merge toggle enabled, so just set timesRejoined = "disabled"
         curParticipant.timesRejoined = "disabled";
         sanitizedParticipants.push(curParticipant);
-        totalParticipantsCount++;
       }
 
     });
-    var totalParticipantsCount = sanitizedParticipants.length;
+    const totalParticipantsCount = sanitizedParticipants.length;
 
     // if totalParticipantsCount = 0, then all participants were blacklisted: skip this meeting
     // if totalParticipantsCount = 1, then it can hardly by called a meeting: skip this meeting
@@ -267,7 +265,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
 
     // make sure to only insert sheets after [Base] and Ranked Attendance and before other attendance sheets
-    const datePrefix = /^\d{4}\/\d{2}\/\d{2}/;
+    const datePrefix = /^(\d{4})-(\d{2})-(\d{2})/;
     while (true) {
       const sheets = ss.getSheets();
       const activeSheet = ss.getActiveSheet();
@@ -284,11 +282,11 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     }
 
     // Insert new sheet for the meeting
-    var newSheet = ss.insertSheet(sheetName);
+    const newSheet = ss.insertSheet(sheetName);
     
 
     // 3. Generate and place the meeting details table first (starts at column H / 8)
-    var detailsHeaders = [
+    const detailsHeaders = [
       "meeting_uuid",
       "meeting_id",
       "topic",
@@ -300,7 +298,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       "end_time"
     ];
 
-    var detailsRow = [
+    const detailsRow = [
       rawUuid,
       meetingId,
       topic,
@@ -308,13 +306,13 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       hostEmail,
       totalParticipantsCount,
       minutesToHM(duration),
-      timeOnly(convertISOTimeZone(startTime)),
-      timeOnly(convertISOTimeZone(endTime))
+      timeOnly(convertedStartTime),
+      timeOnly(convertedEndTime)
     ];
 
 
     // 4. Generate and place the participants table next (starts at column A / 1)
-    var participantHeaders = [
+    const participantHeaders = [
       // "id",
       "name",
       // "user_email",
@@ -325,7 +323,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
       "rejoined"
     ];
 
-    var participantRows = sanitizedParticipants.map(function (p) {
+    const participantRows = sanitizedParticipants.map(function (p) {
       return [
         // p.id || "",
         p.name || "",
@@ -345,7 +343,6 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     newSheet.getRange(2, participantHeaders.length + 2, 1, detailsRow.length).setValues([detailsRow]);
 
     // set participant details
-    // (row, col, num rows, num cols)
     newSheet.getRange(1, 1, 1, participantHeaders.length).setValues([participantHeaders]);
     newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
 
@@ -362,14 +359,14 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
 // function that returns the decimal/percentage similarity between 2 strings (example: 0.9 = 90% similarity between 2 strings)
 function stringSimilarity(s1, s2) {
-  var longer = s1;
-  var shorter = s2;
+  let longer = s1;
+  let shorter = s2;
   if (s1.length < s2.length) {
     longer = s2;
     shorter = s1;
   }
-  var longerLength = longer.length;
-  if (longerLength == 0) {
+  const longerLength = longer.length;
+  if (longerLength === 0) {
     return 1.0;
   }
   return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
@@ -379,16 +376,16 @@ function editDistance(s1, s2) {
   s1 = s1.toLowerCase();
   s2 = s2.toLowerCase();
 
-  var costs = new Array();
-  for (var i = 0; i <= s1.length; i++) {
-    var lastValue = i;
-    for (var j = 0; j <= s2.length; j++) {
-      if (i == 0)
+  const costs = new Array();
+  for (let i = 0; i <= s1.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= s2.length; j++) {
+      if (i === 0)
         costs[j] = j;
       else {
         if (j > 0) {
-          var newValue = costs[j - 1];
-          if (s1.charAt(i - 1) != s2.charAt(j - 1))
+          let newValue = costs[j - 1];
+          if (s1.charAt(i - 1) !== s2.charAt(j - 1))
             newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
           costs[j - 1] = lastValue;
           lastValue = newValue;
@@ -422,7 +419,9 @@ function minutesToHM(minutes) {
   const total = Math.floor(Math.abs(n));
   const h = Math.floor(total / 60);
   const m = total % 60;
-  return `${h}h ${m}m`;
+
+  const pad = (v) => String(v).padStart(2, '0');
+  return `${pad(h)}h ${pad(m)}m`;
 }
 
 // converts a string representing seconds into hours, minutes, seconds, format: "00h 00m 00s"
@@ -449,15 +448,15 @@ function resizeColumnsToFit(sheet) {
 
 
 /**
- * a function that is apparently needed: converts plain datetime format into ISO 8601
+ * a function that sounds stupid, but is needed: converts plain datetime format into ISO 8601
  * example:
  * input: 2026-07-23 17:51:22
  * output: 2026-07-23T17:51:22Z
  */
 function convertPlainToISO(plainDT) {
-  var iso = plainDT.trim().replace(' ', 'T');
-  iso += 'Z';
-  return iso;
+  if (!plainDT) return "";
+  if (plainDT.includes('T') && plainDT.includes('Z')) return plainDT;
+  return plainDT.trim().replace(' ', 'T') + 'Z';
 }
 /**
  * Converts input ISO 8601 (UTC) string into a specified locale string (defaulting to PT)
@@ -491,18 +490,11 @@ function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
   return `${year}-${month}-${day}, ${hour}:${minute}:${second} ${dayPeriod}`;
 }
 
-// intended to be used after convertISOTimeZone(), returns only the date
-function dateOnly(datetime) {
-  const i = datetime.indexOf(' ');
-  const date = datetime.slice(0, i);
-  return date;
-}
-
 // intended to be used after convertISOTimeZone(), returns only the time
 function timeOnly(datetime) {
+  if (!datetime) return "";
   const i = datetime.indexOf(' ');
-  const time = datetime.slice(i + 1);
-  return time;
+  return i >= 0 ? datetime.slice(i + 1) : datetime;
 }
 
 

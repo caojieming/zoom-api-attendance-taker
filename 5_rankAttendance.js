@@ -1,5 +1,10 @@
-// creates a new sheet that shows attendees ranked by attendance rate (# of meetings attended / total # of meetings traversed) + which meetings they attended
+// if merging similar is enabled, merge participants when one name is directly contained in the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long
+const PARTIAL_NAME_THRESHOLD = 6;
 
+
+/**
+ * creates a new sheet that shows attendees ranked by attendance rate (# of meetings attended / total # of meetings traversed) + which meetings they attended
+ */
 function rankAttendance() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = ss.getSheets();
@@ -13,7 +18,8 @@ function rankAttendance() {
   // 1) Sheets to the right of active whose names start with a date
   const meetingSheets = [];
   for (let i = 0; i < sheets.length; i++) {
-    if (activeIndex !== -1 && i <= activeIndex) continue;
+    // getIndex() is 1-based, sheets[] is 0-based
+    if (i + 1 <= activeIndex) continue;
     const nm = sheets[i].getName().trim();
     if (startDateRe.test(nm)) meetingSheets.push(sheets[i]);
   }
@@ -23,11 +29,11 @@ function rankAttendance() {
     const m = sh.getName().trim().match(startDateRe);
     return m ? m[0] : sh.getName().trim();
   });
-  const totalNumMeetings = dates.length;
 
   // 2) Count meetings attended + store (string) duration per meeting per participant
   // participantData = { name: { attended: #, durationsByDate: { [dateLabel]: durationString } } }
   const participantData = {};
+  let totalNumMeetings = 0;
 
   for (let i = 0; i < meetingSheets.length; i++) {
     const sh = meetingSheets[i];
@@ -50,6 +56,8 @@ function rankAttendance() {
 
     const nameValues = sh.getRange(2, 1, numRows, 1).getValues(); // col A
     const durationValues = sh.getRange(2, durationColIndex + 1, numRows, 1).getValues(); // "duration" col
+
+    totalNumMeetings++;
 
     // go through each participant in the current sheet/meeting
     for (let r = 0; r < numRows; r++) {
@@ -82,7 +90,7 @@ function rankAttendance() {
   }));
 
   // merge similar names
-  if(MERGE_SIMILAR) {
+  if (MERGE_SIMILAR) {
     participants = mergeSimilarParticipants(participants);
   }
 
@@ -99,6 +107,7 @@ function rankAttendance() {
   if (existing) ss.deleteSheet(existing);
   const rankedSheet = ss.insertSheet("Ranked Attendance");
   // google sheets is 1 indexed, this ensures that rankedSheet will be the 2nd sheet
+  ss.setActiveSheet(rankedSheet);
   ss.moveActiveSheet(2);
 
   const header = ["name", "rate", ...dates];
@@ -119,15 +128,20 @@ function rankAttendance() {
   rankedSheet.getRange(1, 1, 1, header.length).setValues([header]);
   if (rows.length) rankedSheet.getRange(2, 1, rows.length, header.length).setValues(rows);
 
-  rankedSheet.getRange(1, 1, rows.length + 1, header.length).createFilter();
+  if (rows.length) {
+    rankedSheet.getRange(1, 1, rows.length + 1, header.length).createFilter();
+  }
   resizeColumnsToFit(rankedSheet);
 }
 
 
-// helper function to merge similar participants
+/**
+ * helper function to merge similar participants
+ */
 function mergeSimilarParticipants(participants) {
   // Merge participants that satisfy stringSimilarity() >= MERGE_SIMILAR_PERCENTAGE
-  // choose merged name from participant with highest attended value
+  // Also merge participants when one name is directly contained in the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long.
+  // For direct containment, only merge when the shorter name is a whole word or a prefix of the longer name, not just any substring match. Choose the longest name as the main name.
   // merged attended = sum of all attended
   // merged durationsByDate includes all dateLabels (no collisions assumed), sorted in reverse alphabetical order.
   const mergedParticipants = [];
@@ -136,27 +150,47 @@ function mergeSimilarParticipants(participants) {
   for (let i = 0; i < participants.length; i++) {
     if (used[i]) continue;
 
-    // Build a merge group containing i + any other participant j where any member x in the current group satisfies stringSimilarity(x, j) >= MERGE_SIMILAR_PERCENTAGE
     const groupIdx = [i];
     used[i] = true;
 
-    // get all participants within a certain % of similarity of participants[i]
-    for (let j = i + 1; j < participants.length; j++) {
-      if (used[j]) continue;
+    // Expand the group until no more similar participants are found
+    for (let g = 0; g < groupIdx.length; g++) {
+      const baseIdx = groupIdx[g];
 
-      // x == i
-      const shouldMerge = groupIdx.some(x => (stringSimilarity(participants[x].name, participants[j].name) >= MERGE_SIMILAR_PERCENTAGE));
-      if (!shouldMerge) continue;
+      for (let j = i + 1; j < participants.length; j++) {
+        if (used[j]) continue;
 
-      groupIdx.push(j);
-      used[j] = true;
+        const nameA = participants[baseIdx].name;
+        const nameB = participants[j].name;
+
+        // Direct containment merge:
+        // only merge if the shorter name has at least PARTIAL_NAME_THRESHOLD characters
+        // and is either a whole word or a prefix of the longer name
+        const shorter = nameA.length <= nameB.length ? nameA : nameB;
+        const longer = nameA.length > nameB.length ? nameA : nameB;
+
+        const shorterLen = shorter.length;
+        const wholeWord =
+          new RegExp(`(^|\\s)${escapeRegExp(shorter)}($|\\s)`).test(longer);
+        const prefix = longer.startsWith(shorter);
+
+        const directlyContains = shorterLen >= PARTIAL_NAME_THRESHOLD && (wholeWord || prefix);
+
+        const similar =
+          stringSimilarity(nameA, nameB) >= MERGE_SIMILAR_PERCENTAGE;
+
+        if (directlyContains || similar) {
+          groupIdx.push(j);
+          used[j] = true;
+        }
+      }
     }
 
-    // Pick representative name (participant with higher attended; ties keep first encountered)
+    // Pick representative name (participant with the longest name; ties keep first encountered)
     let repIdx = groupIdx[0];
     for (let g = 1; g < groupIdx.length; g++) {
       const idx = groupIdx[g];
-      if (participants[idx].attended > participants[repIdx].attended) {
+      if (participants[idx].name.length > participants[repIdx].name.length) {
         repIdx = idx;
       }
     }
@@ -186,3 +220,11 @@ function mergeSimilarParticipants(participants) {
 
   return mergedParticipants;
 }
+
+/**
+ * Escape special regex characters in a string.
+ */
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
