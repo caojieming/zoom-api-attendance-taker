@@ -1,4 +1,4 @@
-/*
+/**
 THIS IS IMPORTANT, READ ME:
 
 This file is used to contain all sensitive keys, passwords, IDs, etc. that this Apps Script uses.
@@ -19,13 +19,24 @@ const key = PropertiesService.getScriptProperties().getProperty('SAMPLE_API_KEY_
 */
 
 
-/* for getting zoom access token */
-// set these according to your Zoom App
-const ACCOUNT_ID = '';
-const CLIENT_ID = '';
-const CLIENT_SECRET = '';
+/* for getting zoom OAuth access tokens, set these according to your Zoom App */
+// ACCOUNT_ID is the same for all Zoom apps on the same account
+const ACCOUNT_ID = "";
+
+// Zoom App ID + "password" for attendance taker
+const ATTENDANCE_CLIENT_ID = "";
+const ATTENDANCE_CLIENT_SECRET = "";
+
+// Zoom App ID + "password" for recordings/transcripts getter
+const RECORDINGS_CLIENT_ID = "";
+const RECORDINGS_CLIENT_SECRET = "";
 
 
-/* for getting meetings + participants */
-// used for filtering only meetings with a certain meeting ID
+// for getting meetings + participants, used for filtering only meetings with a certain meeting ID
 const MEETING_ID = "";
+
+// the last part of the desired folder link (https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID})
+const DRIVE_FOLDER_ID = "";
+
+// self explanatory, API key to gemini via Google AI Studio.
+const GEMINI_API_KEY = "";

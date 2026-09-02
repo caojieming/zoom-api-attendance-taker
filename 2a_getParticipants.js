@@ -1,31 +1,4 @@
-// helper constants used for setting FROM and TO times
-const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
-const ONE_DAY_AGO = daysAgo(1);
-const THREE_DAYS_AGO = daysAgo(3);
-const ONE_WEEK_AGO = daysAgo(7);
-const ONE_MONTH_AGO = daysAgo(30);
-const TWO_MONTHS_AGO = daysAgo(60);
-const THREE_MONTHS_AGO = daysAgo(90);
-const FOUR_MONTHS_AGO = daysAgo(120);
-const FIVE_MONTHS_AGO = daysAgo(150);
-const SIX_MONTHS_AGO = daysAgo(180);
-
-
-// request constants, these are sent to Zoom API as part of the request
-// time period of past meetings to GET
-const FROM = ONE_MONTH_AGO;
-const TO = NOW;
-// Type of meeting (meeting or webinar, can also send "" for both)
-const MEETING_TYPE = "meeting";
-// Optional search query key if you only want meetings with specific word(s) in the topic name
-const SEARCH_KEY = "";
-// Max meetings per request page (up to 300), used to lower request rate to prevent hitting API rate limits
-const PAGE_SIZE = 200;
-
-
 /* Extra filters */
-// toggle to include only meetings that occurr on 4th thursdays of the month
-const ONLY_FOURTH_THURS = true;
 
 // if participant name has any of these phrases, cut off everything from this point onwards (including the phrase)
 const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone", " | ", " SoCal", ", ", ": ", " SaaS ", "’s iPad"];
@@ -36,16 +9,18 @@ const PARTICIPANT_MIN_NAME_LENGTH = 2;
 // if participant name has any of these words, exclude them from the sheet
 const PARTICIPANT_BLACKLIST = ['notetaker', 'read.ai'];
 
+
 // merge participant entries with exact same name
 const MERGE_DUPES = true;
-
 // merge similar participant entries within a certain margin of error
 const MERGE_SIMILAR = true;
 const MERGE_SIMILAR_PERCENTAGE = 0.8;
 
 
 
-// can't get more than 1 month worth of records at a time, need to call multiple times
+/**
+ * can't get more than 1 month worth of records at a time, need to call multiple times
+ */
 function getParticipantsHalfYear() {
   getParticipants(ONE_MONTH_AGO, NOW);
   getParticipants(TWO_MONTHS_AGO, ONE_MONTH_AGO);
@@ -64,7 +39,7 @@ function getParticipantsHalfYear() {
  */
 function getParticipants(inFrom = FROM, inTo = TO) {
   // Fetch access token using existing client function (assumed to be defined globally)
-  const accessToken = getZoomAccessToken();
+  const accessToken = getZoomAccessToken(ACCOUNT_ID, ATTENDANCE_CLIENT_ID, ATTENDANCE_CLIENT_SECRET);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   let meetings = [];
@@ -357,7 +332,9 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
 
 
-// function that returns the decimal/percentage similarity between 2 strings (example: 0.9 = 90% similarity between 2 strings)
+/**
+ * function that returns the decimal/percentage similarity between 2 strings (example: 0.9 = 90% similarity between 2 strings)
+ */
 function stringSimilarity(s1, s2) {
   let longer = s1;
   let shorter = s2;
@@ -371,7 +348,9 @@ function stringSimilarity(s1, s2) {
   }
   return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
 }
-// function that returns the Levenshtein distance of 2 strings (aka the # of edits needed to make string1 into string2)
+/**
+ * function that returns the Levenshtein distance of 2 strings (aka the # of edits needed to make string1 into string2)
+ */
 function editDistance(s1, s2) {
   s1 = s1.toLowerCase();
   s2 = s2.toLowerCase();
@@ -396,124 +375,4 @@ function editDistance(s1, s2) {
       costs[s2.length] = lastValue;
   }
   return costs[s2.length];
-}
-
-
-// check if the input ISO is the 4th thursday in the month
-function isFourthThursday(isoDate) {
-  const date = new Date(isoDate);
-  // Check if the day is Thursday (4)
-  if (date.getDay() !== 4) {
-    return false;
-  }
-  const dayOfMonth = date.getDate();
-  // Check if the date is between 22 and 28
-  return dayOfMonth >= 22 && dayOfMonth <= 28;
-}
-
-
-// converts a string representing minutes into hours, minutes
-function minutesToHM(minutes) {
-  const n = parseFloat(minutes);
-  if (!isFinite(n)) return '0h 0m 0s';
-  const total = Math.floor(Math.abs(n));
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-
-  const pad = (v) => String(v).padStart(2, '0');
-  return `${pad(h)}h ${pad(m)}m`;
-}
-
-// converts a string representing seconds into hours, minutes, seconds, format: "00h 00m 00s"
-function secondsToHMS(seconds) {
-  const n = parseFloat(seconds);
-  if (!isFinite(n)) return '00h 00m 00s';
-  const total = Math.floor(Math.abs(n));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-
-  const pad = (v) => String(v).padStart(2, '0');
-  return `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
-}
-
-
-// simple func that takes in a sheet and auto resizes all columns that contain values
-function resizeColumnsToFit(sheet) {
-  const dataRange = sheet.getDataRange();
-  if (dataRange.getNumColumns() > 0) {
-    sheet.autoResizeColumns(1, dataRange.getNumColumns());
-  }
-}
-
-
-/**
- * a function that sounds stupid, but is needed: converts plain datetime format into ISO 8601
- * example:
- * input: 2026-07-23 17:51:22
- * output: 2026-07-23T17:51:22Z
- */
-function convertPlainToISO(plainDT) {
-  if (!plainDT) return "";
-  if (plainDT.includes('T') && plainDT.includes('Z')) return plainDT;
-  return plainDT.trim().replace(' ', 'T') + 'Z';
-}
-/**
- * Converts input ISO 8601 (UTC) string into a specified locale string (defaulting to PT)
- * iso format: '2023-06-08T18:30:00Z'
- * newTimeZone format: 'America/Los_Angeles'
- */
-function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
-  const dt = new Date(iso);
-
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: newTimeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  }).formatToParts(dt);
-
-  const get = (type) => parts.find(p => p.type === type)?.value;
-
-  const year = get('year');
-  const month = get('month');
-  const day = get('day');
-  const hour = get('hour');
-  const minute = get('minute');
-  const second = get('second');
-  const dayPeriod = get('dayPeriod'); // AM/PM
-
-  return `${year}-${month}-${day}, ${hour}:${minute}:${second} ${dayPeriod}`;
-}
-
-// intended to be used after convertISOTimeZone(), returns only the time
-function timeOnly(datetime) {
-  if (!datetime) return "";
-  const i = datetime.indexOf(' ');
-  return i >= 0 ? datetime.slice(i + 1) : datetime;
-}
-
-
-/**
- * Prepares the Zoom Meeting UUID for use in URL paths, applying double-encoding
- * if the UUID contains a forward slash or begins with one.
- * @param {string} uuid - The raw Zoom UUID.
- * @returns {string} The URL encoded UUID.
- */
-function prepareUuid(uuid) {
-  if (!uuid) return "";
-  if (uuid.indexOf('/') !== -1 || uuid.startsWith('/')) {
-    return encodeURIComponent(encodeURIComponent(uuid));
-  }
-  return encodeURIComponent(uuid);
-}
-
-
-// a simple function to get the datetime "days" ago
-function daysAgo(days) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 }

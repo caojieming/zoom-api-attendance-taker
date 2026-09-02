@@ -1,4 +1,29 @@
-// sorts subsheets with names that start with dates from most recent to least recent
+/**
+ * Delete all sheets in the active spreadsheet except the sheet with the given name in BASE_SHEET_NAME.
+ * Usage: set BASE_SHEET_NAME (in 1b) then run clearRecords()
+ */
+function clearRecords() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+  if (sheets.length <= 1) return; // nothing to delete
+
+  const keep = ss.getSheetByName(BASE_SHEET_NAME);
+  if (!keep) {
+    throw new Error(`Sheet named "${BASE_SHEET_NAME}" not found.`);
+  }
+
+  // Delete every sheet whose name is not the keep name
+  sheets.forEach(sheet => {
+    if (sheet.getName() !== BASE_SHEET_NAME) {
+      ss.deleteSheet(sheet);
+    }
+  });
+}
+
+
+/**
+ * sorts subsheets with names that start with dates from most recent to least recent
+ */
 function sortRecords() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetsInOrder = ss.getSheets(); // current left-to-right order

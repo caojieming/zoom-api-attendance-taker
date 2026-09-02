@@ -227,4 +227,3 @@ function mergeSimilarParticipants(participants) {
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
-
