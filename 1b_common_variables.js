@@ -34,3 +34,18 @@ const PAGE_SIZE = 200;
 
 // toggle to include only meetings that occurr on 4th thursdays of the month
 const ONLY_FOURTH_THURS = true;
+
+
+// gemini model to use when applicable
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
+/**
+List of ideal models to use (these models are in high demand and may fail to run):
+gemini-3.7-flash
+gemini-3.6-flash
+gemini-3.5-flash
+
+Models below are the safe backup models (more likely to work without issue):
+gemini-3.5-flash-lite
+
+Generally best to stick with the lite model, I've consistently run into high traffic errors with the normal models.
+*/

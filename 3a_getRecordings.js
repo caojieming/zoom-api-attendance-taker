@@ -93,7 +93,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
           }
         }
         else if(file.file_type === "CHAT") {
-          const fileName = datetime + " [Chat]";
+          const fileName = datetime + " [Chat Log]";
           // Skip if a file with this name already exists in the folder
           if (existingFilenames.has(fileName)) {
             console.log("File already imported: " + fileName);
@@ -101,10 +101,21 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
           else {
             const downloadUrl = file.download_url;
             console.log("Downloading/Importing: " + fileName);
-            const rawChat = httpGetData(downloadUrl, accessToken);
-            const transcript = rawChat.data;
-            createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, transcript);
+            const rawChatLog = httpGetData(downloadUrl, accessToken);
+            const chatLog = rawChatLog.data;
+            createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, chatLog);
             existingFilenames.add(fileName);
+
+            // create chat participants sheet from chat logs if it doesn't already exist
+            const sheetName = `${datetime} [Chat Participants]`;
+            if(!existingFilenames.has(sheetName)) {
+              console.log("Generating: " + sheetName);
+              createChatParticipantsSheet(DRIVE_FOLDER_ID, sheetName, chatLog);
+              existingFilenames.add(sheetName);
+            }
+            else {
+              console.log("File already generated: " + sheetName);
+            }
           }
         }
       });

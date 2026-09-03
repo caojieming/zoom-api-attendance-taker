@@ -1,5 +1,5 @@
 /**
-This file contains all functions that are used in multiple files (or are at least generic enough that they could be used in different files)
+This file contains all functions that are used in multiple files (or are at least generic enough that they could be used in multiple files)
 */
 
 
@@ -174,4 +174,19 @@ function goToSheet(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
   if (sheet) ss.setActiveSheet(sheet);
+}
+
+
+/**
+ * creates a spreadsheet in a specific folder
+ */
+function createSpreadsheetInFolder(sheetName, folderId) {
+  const ss = SpreadsheetApp.create(sheetName);
+  const file = DriveApp.getFileById(ss.getId());
+  const folder = DriveApp.getFolderById(folderId);
+
+  folder.addFile(file);
+  DriveApp.getRootFolder().removeFile(file);
+
+  return ss;
 }
