@@ -63,9 +63,11 @@ Return ONLY valid JSON in this exact shape:
   "participants": [
     {
       "name": "participant name",
+      "email": "participant email",
       "linkedin_url": "full LinkedIn URL or empty string",
       "chapter": "city or state name or empty string",
-      "self_introduction": "brief self-introduction extracted or inferred from the chat"
+      "self_introduction": "brief self-introduction extracted or inferred from the chat",
+      "summary": "brief summary of what the participant contributed to the chat, extracted or inferred from the chat"
     }
   ]
 }
@@ -73,11 +75,14 @@ Return ONLY valid JSON in this exact shape:
 Rules:
 - Return one entry per unique participant.
 - Include only people who appear to be participants in the chat.
-- Use the person's stated name if available; otherwise use the best available identifier.
+- name: use the person's stated name if available; otherwise use the best available identifier.
+- email: fill in only if explicitly found in the chat; otherwise use an empty string.
 - linkedin_url: fill in only if explicitly found in the chat; otherwise use an empty string.
 - chapter: generally a city or state name; fill in only if explicitly found in the chat; otherwise use an empty string.
-- self_introduction should be short and based on how the participant introduces themselves in the chat.
+- self_introduction: should be short and based on how the participant introduces themselves in the chat.
 - If a participant does not self-introduce, infer a concise one from the available context, or use an empty string if none is available.
+- summary: should be a no more than 3 sentences long, and should be about what the participant contributed to the chat log
+- If the participant shared a URL link, be sure to include the full link in the summary (unless it's a LinkedIn URL, then don't include it to the summary).
 - Merge duplicate references to the same person.
 - Do not include people mentioned only in passing unless they clearly participate.
 - Output between 1 and 50 participants unless the chat clearly supports fewer or more.
@@ -93,12 +98,14 @@ ${chatLog}
     fileName,
     prompt,
     rootKey: "participants",
-    headers: ["name", "linkedin_url", "chapter", "self_introduction"],
+    headers: ["name", "email", "linkedin_url", "chapter", "self_introduction", "summary"],
     rowMapper: p => [
       p.name || "",
+      p.email || "",
       p.linkedin_url || "",
       p.chapter || "",
-      p.self_introduction || ""
+      p.self_introduction || "",
+      p.summary || ""
     ],
     countKey: "participantsCount"
   });
