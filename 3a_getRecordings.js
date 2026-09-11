@@ -66,56 +66,74 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
       (recordingsData.recording_files || []).forEach(function(file) {
         if(file.file_type === "TRANSCRIPT") {
           const fileName = datetime + " [Transcript]";
+          const fileNameExists = existingFilenames.has(fileName);
+          const sheetName = datetime + " [Key Topics]";
+          const sheetNameExists = existingFilenames.has(sheetName);
+
+          // both file and sheet exist, exit this subfunction and move onto the next file
+          if(fileNameExists && sheetNameExists) {
+            return;
+          }
+
+          const downloadUrl = file.download_url;
+          const rawTranscript = httpGetData(downloadUrl, accessToken);
+          let transcript = rawTranscript.data;
+          // just removes the excessive number of extra newlines in the transcript
+          transcript = transcript.replace(/\n/g, '');
+
           // Skip if a file with this name already exists in the folder
-          if (existingFilenames.has(fileName)) {
+          if (fileNameExists) {
             console.log("File already imported: " + fileName);
           }
           else {
-            const downloadUrl = file.download_url;
             console.log("Downloading/Importing: " + fileName);
-            const rawTranscript = httpGetData(downloadUrl, accessToken);
-            let transcript = rawTranscript.data;
-            // just removes the excessive number of extra newlines in the transcript
-            transcript = transcript.replace(/\n/g, '');
             createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, transcript);
             existingFilenames.add(fileName);
-
-            // create key topics sheet from transcript if it doesn't already exist
-            const sheetName = `${datetime} [Key Topics]`;
-            if(!existingFilenames.has(sheetName)) {
-              console.log("Generating: " + sheetName);
-              createKeyTopicsSheet(DRIVE_FOLDER_ID, sheetName, transcript);
-              existingFilenames.add(sheetName);
-            }
-            else {
-              console.log("File already generated: " + sheetName);
-            }
+          }
+          
+          // create key topics sheet from transcript if it doesn't already exist
+          if(sheetNameExists) {
+            console.log("File already generated: " + sheetName);
+          }
+          else {
+            console.log("Generating: " + sheetName);
+            createKeyTopicsSheet(DRIVE_FOLDER_ID, sheetName, transcript);
+            existingFilenames.add(sheetName);
           }
         }
         else if(file.file_type === "CHAT") {
           const fileName = datetime + " [Chat Log]";
+          const fileNameExists = existingFilenames.has(fileName);
+          const sheetName = datetime + " [Chat Participants]";
+          const sheetNameExists = existingFilenames.has(sheetName);
+
+          // both file and sheet exist, exit this subfunction and move onto the next file
+          if(fileNameExists && sheetNameExists) {
+            return;
+          }
+
+          const downloadUrl = file.download_url;
+          const rawChatLog = httpGetData(downloadUrl, accessToken);
+          const chatLog = rawChatLog.data;
+          
           // Skip if a file with this name already exists in the folder
-          if (existingFilenames.has(fileName)) {
+          if (fileNameExists) {
             console.log("File already imported: " + fileName);
           }
           else {
-            const downloadUrl = file.download_url;
             console.log("Downloading/Importing: " + fileName);
-            const rawChatLog = httpGetData(downloadUrl, accessToken);
-            const chatLog = rawChatLog.data;
             createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, chatLog);
             existingFilenames.add(fileName);
+          }
 
-            // create chat participants sheet from chat logs if it doesn't already exist
-            const sheetName = `${datetime} [Chat Participants]`;
-            if(!existingFilenames.has(sheetName)) {
-              console.log("Generating: " + sheetName);
-              createChatParticipantsSheet(DRIVE_FOLDER_ID, sheetName, chatLog);
-              existingFilenames.add(sheetName);
-            }
-            else {
-              console.log("File already generated: " + sheetName);
-            }
+          // create chat participants sheet from chat logs if it doesn't already exist
+          if(sheetNameExists) {
+            console.log("File already generated: " + sheetName);
+          }
+          else {
+            console.log("Generating: " + sheetName);
+            createChatParticipantsSheet(DRIVE_FOLDER_ID, sheetName, chatLog);
+            existingFilenames.add(sheetName);
           }
         }
       });

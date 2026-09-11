@@ -64,6 +64,7 @@ Return ONLY valid JSON in this exact shape:
     {
       "name": "participant name",
       "email": "participant email",
+      "phone": "participant phone number",
       "linkedin_url": "full LinkedIn URL or empty string",
       "chapter": "city or state name or empty string",
       "self_introduction": "brief self-introduction extracted or inferred from the chat",
@@ -77,6 +78,7 @@ Rules:
 - Include only people who appear to be participants in the chat.
 - name: use the person's stated name if available; otherwise use the best available identifier.
 - email: fill in only if explicitly found in the chat; otherwise use an empty string.
+- phone: fill in only if explicitly found in the chat; otherwise use an empty string.
 - linkedin_url: fill in only if explicitly found in the chat; otherwise use an empty string.
 - chapter: generally a city or state name; fill in only if explicitly found in the chat; otherwise use an empty string.
 - self_introduction: should be short and based on how the participant introduces themselves in the chat.
@@ -98,10 +100,11 @@ ${chatLog}
     fileName,
     prompt,
     rootKey: "participants",
-    headers: ["name", "email", "linkedin_url", "chapter", "self_introduction", "summary"],
+    headers: ["name", "email", "phone", "linkedin_url", "chapter", "self_introduction", "summary"],
     rowMapper: p => [
       p.name || "",
       p.email || "",
+      p.phone || "",
       p.linkedin_url || "",
       p.chapter || "",
       p.self_introduction || "",
