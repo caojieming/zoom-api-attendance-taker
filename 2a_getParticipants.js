@@ -321,12 +321,11 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     newSheet.getRange(1, 1, 1, participantHeaders.length).setValues([participantHeaders]);
     newSheet.getRange(2, 1, participantRows.length, participantHeaders.length).setValues(participantRows);
 
-    // auto resize columns
-    resizeColumnsToFit(newSheet);
-
     // add a filter to columns A to F
     newSheet.getRange(1, 1, participantRows.length + 1, participantHeaders.length).createFilter();
 
+    // auto resize columns
+    resizeColumnsToFit(newSheet);
   });
 }
 

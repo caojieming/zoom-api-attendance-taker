@@ -256,9 +256,9 @@ function writeTableToSheet(sheet, headers, rows) {
   // Make headers bold for readability.
   sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
 
-  // Auto-fit columns to the content.
-  resizeColumnsToFit(sheet);
-
   // Add a filter so the table can be sorted/filtered easily.
   sheet.getRange(1, 1, values.length, headers.length).createFilter();
+
+  // Auto-fit columns to the content.
+  resizeColumnsToFit(sheet);
 }
