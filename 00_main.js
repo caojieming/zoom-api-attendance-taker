@@ -1,8 +1,6 @@
 /**
 This is the main file for functions related to updating both attendance records and meeting recordings/transcripts at once.
 
-All files starting with 1 are necessary for anything to function.
-
 If you only want to update attendance records, please see file 2a.
 If you only want to change attendance getter code, please see all files starting with 2.
 
@@ -19,6 +17,8 @@ function archivePastMonth() {
   rankAttendance();
 
   getRecordings(ONE_MONTH_AGO, NOW);
+
+  buildChatterLinkedInSheet();
 }
 
 
@@ -33,4 +33,6 @@ function archivePastHalfYear() {
   rankAttendance();
 
   getRecordingsHalfYear();
+
+  buildChatterLinkedInSheet();
 }
