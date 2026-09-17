@@ -17,7 +17,6 @@ function archivePastMonth() {
   rankAttendance();
 
   getRecordings(ONE_MONTH_AGO, NOW);
-
   buildChatterLinkedInSheet();
 }
 
@@ -33,6 +32,5 @@ function archivePastHalfYear() {
   rankAttendance();
 
   getRecordingsHalfYear();
-
   buildChatterLinkedInSheet();
 }

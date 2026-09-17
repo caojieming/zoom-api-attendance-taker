@@ -12,21 +12,19 @@ function rankAttendance() {
   const activeSheet = ss.getActiveSheet();
   const activeIndex = activeSheet.getIndex();
 
-  // Match start-of-string: YYYY-MM-DD, then anything after (time, etc.)
-  const startDateRe = /^(\d{4})-(\d{2})-(\d{2})/;
-
   // 1) Sheets to the right of active whose names start with a date
   const meetingSheets = [];
   for (let i = 0; i < sheets.length; i++) {
     // getIndex() is 1-based, sheets[] is 0-based
     if (i + 1 <= activeIndex) continue;
+
     const nm = sheets[i].getName().trim();
-    if (startDateRe.test(nm)) meetingSheets.push(sheets[i]);
+    if (DATE_PREFIX.test(nm)) meetingSheets.push(sheets[i]);
   }
 
   // Date label is the matching prefix only (YYYY-MM-DD)
   const dates = meetingSheets.map(sh => {
-    const m = sh.getName().trim().match(startDateRe);
+    const m = sh.getName().trim().match(DATE_PREFIX);
     return m ? m[0] : sh.getName().trim();
   });
 
@@ -45,7 +43,7 @@ function rankAttendance() {
     const lastCol = sh.getLastColumn();
     if (lastCol < 1) continue;
 
-    // Find "duration" column in header row (row 1) via substring match
+    // Find "duration" column in header row (row 1) via exact match
     const headerRow = sh.getRange(1, 1, 1, lastCol).getValues()[0]
       .map(x => (x ?? "").toString().trim());
 
@@ -90,7 +88,7 @@ function rankAttendance() {
   }));
 
   // merge similar names
-  if (MERGE_SIMILAR) {
+  if (typeof MERGE_SIMILAR !== "undefined" && MERGE_SIMILAR) {
     participants = mergeSimilarParticipants(participants);
   }
 
@@ -105,6 +103,7 @@ function rankAttendance() {
   // 4) Overwrite output sheet
   const existing = ss.getSheetByName("Ranked Attendance");
   if (existing) ss.deleteSheet(existing);
+
   const rankedSheet = ss.insertSheet("Ranked Attendance");
   // google sheets is 1 indexed, this ensures that rankedSheet will be the 2nd sheet
   ss.setActiveSheet(rankedSheet);
@@ -131,6 +130,7 @@ function rankAttendance() {
   if (rows.length) {
     rankedSheet.getRange(1, 1, rows.length + 1, header.length).createFilter();
   }
+
   resizeColumnsToFit(rankedSheet);
 }
 
@@ -220,6 +220,7 @@ function mergeSimilarParticipants(participants) {
 
   return mergedParticipants;
 }
+
 
 /**
  * Escape special regex characters in a string.

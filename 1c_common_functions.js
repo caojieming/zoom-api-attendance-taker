@@ -4,111 +4,156 @@ This file contains all functions that are used in multiple files (or are at leas
 
 
 /**
- * gets Zoom OAuth token for the Zoom App specified by ACCOUNT_ID, CLIENT_ID, and CLIENT_SECRET
- * basically the keycard to accessing Zoom info
+ * Gets a Zoom OAuth access token using account credentials.
+ * @param {string} accountId
+ * @param {string} clientId
+ * @param {string} clientSecret
+ * @returns {string}
  */
 function getZoomAccessToken(accountId, clientId, clientSecret) {
+  if (!accountId || !clientId || !clientSecret) {
+    throw new Error('Missing Zoom OAuth credentials.');
+  }
+
   const tokenUrl = 'https://zoom.us/oauth/token';
-  const basic = Utilities.base64Encode(`${clientId}:${clientSecret}`);
-  const options = {
+  const basicAuth = Utilities.base64Encode(`${clientId}:${clientSecret}`);
+
+  const response = UrlFetchApp.fetch(tokenUrl, {
     method: 'post',
     headers: {
-      Authorization: 'Basic ' + basic,
-      'Content-Type': 'application/x-www-form-urlencoded'
+      Authorization: `Basic ${basicAuth}`,
     },
     payload: {
       grant_type: 'account_credentials',
-      account_id: accountId
+      account_id: accountId,
     },
-    muteHttpExceptions: true
-  };
-  const resp = UrlFetchApp.fetch(tokenUrl, options);
-  if (resp.getResponseCode() !== 200) {
-    throw new Error('Token request failed: ' + resp.getContentText());
+    muteHttpExceptions: true,
+  });
+
+  const status = response.getResponseCode();
+  const body = response.getContentText();
+
+  if (status !== 200) {
+    throw new Error(`Token request failed (${status}): ${body}`);
   }
-  const data = JSON.parse(resp.getContentText());
+
+  const data = JSON.parse(body);
+  if (!data.access_token) {
+    throw new Error('Token response did not include access_token.');
+  }
+
   // the below log()s are purely for making sure there is a token, keep it commented out otherwise
   // Logger.log(resp.getResponseCode());
   // Logger.log(resp.getContentText());
+
   return data.access_token;
 }
 
 
 /**
- * check if the input ISO is the 4th thursday in the month
+ * Returns true if the given date falls on the fourth Thursday of its month.
+ * @param {string|Date} isoDate
+ * @returns {boolean}
  */
 function isFourthThursday(isoDate) {
   const date = new Date(isoDate);
-  // Check if the day is Thursday (4)
-  if (date.getDay() !== 4) {
-    return false;
-  }
+  if (isNaN(date.getTime())) return false;
+
+  // Thursday = 4 in JavaScript's getDay()
+  if (date.getDay() !== 4) return false;
+
   const dayOfMonth = date.getDate();
-  // Check if the date is between 22 and 28
   return dayOfMonth >= 22 && dayOfMonth <= 28;
 }
 
 
 /**
- * converts a string representing minutes into hours, minutes, format: 00h 00m
+ * Pads a number to 2 digits.
+ * @param {number} value
+ * @returns {string}
+ */
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+
+/**
+ * Converts minutes into "00h 00m".
+ * @param {number|string} minutes
+ * @returns {string}
  */
 function minutesToHM(minutes) {
   const n = parseFloat(minutes);
   if (!isFinite(n)) return '00h 00m';
-  const total = Math.floor(Math.abs(n));
-  const h = Math.floor(total / 60);
-  const m = total % 60;
 
-  const pad = (v) => String(v).padStart(2, '0');
-  return `${pad(h)}h ${pad(m)}m`;
+  const total = Math.floor(Math.abs(n));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+
+  return `${pad2(hours)}h ${pad2(mins)}m`;
 }
 
+
 /**
- * converts a string representing seconds into hours, minutes, seconds, format: 00h 00m 00s
+ * Converts seconds into "00h 00m 00s".
+ * @param {number|string} seconds
+ * @returns {string}
  */
 function secondsToHMS(seconds) {
   const n = parseFloat(seconds);
   if (!isFinite(n)) return '00h 00m 00s';
-  const total = Math.floor(Math.abs(n));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
 
-  const pad = (v) => String(v).padStart(2, '0');
-  return `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+  const total = Math.floor(Math.abs(n));
+  const hours = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  return `${pad2(hours)}h ${pad2(mins)}m ${pad2(secs)}s`;
 }
 
 
 /**
- * simple func that takes in a sheet and auto resizes all columns that contain values
+ * Resizes all populated columns in a sheet to fit their content.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  */
 function resizeColumnsToFit(sheet) {
   const dataRange = sheet.getDataRange();
-  if (dataRange.getNumColumns() > 0) {
-    sheet.autoResizeColumns(1, dataRange.getNumColumns());
+  const numColumns = dataRange.getNumColumns();
+
+  if (numColumns > 0) {
+    sheet.autoResizeColumns(1, numColumns);
   }
 }
 
 
 /**
- * a function that sounds stupid, but is needed: converts plain datetime format into ISO 8601
- * example:
- * input: 2026-07-23 17:51:22
- * output: 2026-07-23T17:51:22Z
+ * Converts a plain datetime string like "2026-07-23 17:51:22"
+ * into an ISO-like UTC string like "2026-07-23T17:51:22Z".
+ *
+ * If the input already appears to be ISO UTC, it is returned unchanged.
+ *
+ * @param {string} plainDT
+ * @returns {string}
  */
 function convertPlainToISO(plainDT) {
-  if (!plainDT) return "";
-  if (plainDT.includes('T') && plainDT.includes('Z')) return plainDT;
-  return plainDT.trim().replace(' ', 'T') + 'Z';
+  if (!plainDT) return '';
+
+  const value = String(plainDT).trim();
+  if (value.includes('T') && value.endsWith('Z')) return value;
+
+  return `${value.replace(' ', 'T')}Z`;
 }
 
+
 /**
- * Converts input ISO 8601 (UTC) string into a specified locale string (defaulting to PT)
- * iso format: '2023-06-08T18:30:00Z'
- * newTimeZone format: 'America/Los_Angeles'
+ * Converts an ISO UTC datetime string into a formatted datetime in another time zone.
+ * @param {string} iso
+ * @param {string} newTimeZone
+ * @returns {string}
  */
 function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
-  const dt = new Date(iso);
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return '';
 
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: newTimeZone,
@@ -118,69 +163,95 @@ function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: true
-  }).formatToParts(dt);
+    hour12: true,
+  }).formatToParts(date);
 
-  const get = (type) => parts.find(p => p.type === type)?.value;
+  const getPart = (type) => parts.find((p) => p.type === type)?.value || '';
 
-  const year = get('year');
-  const month = get('month');
-  const day = get('day');
-  const hour = get('hour');
-  const minute = get('minute');
-  const second = get('second');
-  const dayPeriod = get('dayPeriod'); // AM/PM
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = getPart('hour');
+  const minute = getPart('minute');
+  const second = getPart('second');
+  const dayPeriod = getPart('dayPeriod');
 
   return `${year}-${month}-${day}, ${hour}:${minute}:${second} ${dayPeriod}`;
 }
 
+
 /**
- * intended to be used after convertISOTimeZone(), returns only the time
+ * Extracts only the time portion from a datetime string produced by convertISOTimeZone().
+ * @param {string} datetime
+ * @returns {string}
  */
 function timeOnly(datetime) {
-  if (!datetime) return "";
-  const i = datetime.indexOf(' ');
-  return i >= 0 ? datetime.slice(i + 1) : datetime;
+  if (!datetime) return '';
+
+  const index = datetime.indexOf(' ');
+  return index >= 0 ? datetime.slice(index + 1) : datetime;
 }
 
 
 /**
- * Prepares the Zoom Meeting UUID for use in URL paths, applying double-encoding
- * if the UUID contains a forward slash or begins with one.
- * @param {string} uuid - The raw Zoom UUID.
- * @returns {string} The URL encoded UUID.
+ * Prepares a Zoom meeting UUID for use in a URL path.
+ * Some UUIDs need double-encoding if they contain forward slashes.
+ * @param {string} uuid
+ * @returns {string}
  */
 function prepareUuid(uuid) {
-  if (!uuid) return "";
-  if (uuid.indexOf('/') !== -1 || uuid.startsWith('/')) {
-    return encodeURIComponent(encodeURIComponent(uuid));
+  if (!uuid) return '';
+
+  const value = String(uuid);
+  if (value.includes('/')) {
+    return encodeURIComponent(encodeURIComponent(value));
   }
-  return encodeURIComponent(uuid);
+
+  return encodeURIComponent(value);
 }
 
 
 /**
- * a simple function to get the datetime "days" ago
+ * Returns the UTC date string for a number of days ago, in "YYYY-MM-DD" format.
+ * @param {number|string} days
+ * @returns {string}
  */
 function daysAgo(days) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const n = parseInt(days, 10);
+  if (!isFinite(n)) return '';
+
+  const date = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+  return date.toISOString().split('T')[0];
 }
 
 
 /**
- * sets the active sheet tab to the sheet tab with the name "sheetName"
+ * Switches the active spreadsheet tab to the sheet with the given name.
+ * @param {string} sheetName
  */
 function goToSheet(sheetName) {
+  if (!sheetName) return;
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
-  if (sheet) ss.setActiveSheet(sheet);
+
+  if (sheet) {
+    ss.setActiveSheet(sheet);
+  }
 }
 
 
 /**
- * creates a spreadsheet in a specific folder
+ * Creates a new spreadsheet and moves it into the specified Drive folder.
+ * @param {string} sheetName
+ * @param {string} folderId
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
  */
 function createSpreadsheetInFolder(sheetName, folderId) {
+  if (!sheetName || !folderId) {
+    throw new Error('Missing sheetName or folderId.');
+  }
+
   const ss = SpreadsheetApp.create(sheetName);
   const file = DriveApp.getFileById(ss.getId());
   const folder = DriveApp.getFolderById(folderId);

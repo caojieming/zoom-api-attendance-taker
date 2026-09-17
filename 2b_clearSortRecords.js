@@ -1,20 +1,17 @@
 /**
- * Delete all sheets in the active spreadsheet except the sheet with the given name in BASE_SHEET_NAME.
- * Usage: set BASE_SHEET_NAME (in 1b) then run clearRecords()
+ * Delete all sheets except the one named in BASE_SHEET_NAME.
  */
 function clearRecords() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = ss.getSheets();
-  if (sheets.length <= 1) return; // nothing to delete
+  const keepName = BASE_SHEET_NAME;
+  const keepSheet = ss.getSheetByName(keepName);
 
-  const keep = ss.getSheetByName(BASE_SHEET_NAME);
-  if (!keep) {
-    throw new Error(`Sheet named "${BASE_SHEET_NAME}" not found.`);
+  if (!keepSheet) {
+    throw new Error(`Sheet named "${keepName}" not found.`);
   }
 
-  // Delete every sheet whose name is not the keep name
-  sheets.forEach(sheet => {
-    if (sheet.getName() !== BASE_SHEET_NAME) {
+  ss.getSheets().forEach(sheet => {
+    if (sheet.getName() !== keepName) {
       ss.deleteSheet(sheet);
     }
   });
@@ -22,28 +19,28 @@ function clearRecords() {
 
 
 /**
- * sorts subsheets with names that start with dates from most recent to least recent
+ * Sort sheets whose names start with YYYY-MM-DD from newest to oldest.
+ * Non-date sheets stay in their current relative order and remain first.
  */
 function sortRecords() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetsInOrder = ss.getSheets(); // current left-to-right order
+  const sheets = ss.getSheets();
 
-  const dateRegex = /^(\d{4})-(\d{2})-(\d{2})/; // starts with YYYY-MM-DD
+  const nonDateSheets = [];
+  const dateSheets = [];
 
-  // Keep everything before the first matching (non-date) sheet in place.
-  const firstValidIdx = sheetsInOrder.findIndex(s => dateRegex.test(s.getName()));
-  const prefix = firstValidIdx === -1 ? sheetsInOrder : sheetsInOrder.slice(0, firstValidIdx);
+  sheets.forEach(sheet => {
+    if (DATE_PREFIX.test(sheet.getName())) {
+      dateSheets.push(sheet);
+    } else {
+      nonDateSheets.push(sheet);
+    }
+  });
 
-  const dateSheets = firstValidIdx === -1 ? [] : sheetsInOrder.slice(firstValidIdx).filter(s => dateRegex.test(s.getName()));
-
-  // Sort only the date sheets; leave any non-date sheets after that untouched/ignored per your request.
   dateSheets.sort((a, b) => b.getName().localeCompare(a.getName()));
 
-  // Desired final order = prefix (unchanged order) + sorted date sheets
-  const desired = prefix.concat(dateSheets);
-
-  desired.forEach((sheet, i) => {
+  [...nonDateSheets, ...dateSheets].forEach((sheet, index) => {
     ss.setActiveSheet(sheet);
-    ss.moveActiveSheet(i + 1); // positions are 1-based
+    ss.moveActiveSheet(index + 1);
   });
 }

@@ -7,6 +7,10 @@ These are variables that are used among multiple different files, mainly 2a and 
 const BASE_SHEET_NAME = '[Base]';
 
 
+// regex to match start-of-string: YYYY-MM-DD, then anything else after (time, etc.)
+const DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})/;
+
+
 // helper constants used for setting FROM and TO times
 const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
 const ONE_DAY_AGO = daysAgo(1);
