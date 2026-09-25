@@ -179,10 +179,12 @@ function organizeFilesByDate(rootFolderId) {
     const name = file.getName();
 
     // Match files that start with YYYY-MM-DD
-    const match = name.match(/^(\d{4}-\d{2}-\d{2})/);
+    const match = name.match(DATE_PREFIX);
     if (!match) continue;
 
-    const dateFolderName = match[1];
+    const dateFolderName = match[0];
+    // console.log(match);
+    // console.log(dateFolderName);
 
     // Find or create the date folder inside the root folder
     const folderIterator = rootFolder.getFoldersByName(dateFolderName);
