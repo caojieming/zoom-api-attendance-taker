@@ -53,3 +53,7 @@ gemini-3.5-flash-lite
 
 Generally best to stick with the lite model, I've consistently run into high traffic errors with the normal models.
 */
+
+
+// name of the specific sheet in MEMBERS_SPREADSHEET_ID that has desired info
+const MEMBERS_SPREADSHEET_SHEETNAME = "Full Member List";

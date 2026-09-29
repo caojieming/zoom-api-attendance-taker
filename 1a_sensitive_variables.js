@@ -38,5 +38,8 @@ const MEETING_ID = "";
 // the last part of the desired folder link (https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID})
 const DRIVE_FOLDER_ID = "";
 
+// ID to spreadsheet that contains all members info, found in the link of the spreadsheet between "/d/" and "/edit"
+const MEMBERS_SPREADSHEET_ID = "";
+
 // self explanatory, API key to gemini via Google AI Studio.
 const GEMINI_API_KEY = "";

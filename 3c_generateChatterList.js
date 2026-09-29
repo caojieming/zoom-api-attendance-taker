@@ -26,13 +26,8 @@ function buildChatterLinkedInSheet() {
     existingFiles.next().setTrashed(true);
   }
 
-  // Create the new output spreadsheet.
-  const outputSpreadsheet = SpreadsheetApp.create(outputName);
-  const outputFile = DriveApp.getFileById(outputSpreadsheet.getId());
-
-  // Move the file into the target folder and remove it from root.
-  baseFolder.addFile(outputFile);
-  DriveApp.getRootFolder().removeFile(outputFile);
+  // Create the new output spreadsheet in DRIVE_FOLDER_ID.
+  const outputSpreadsheet = createSpreadsheetInFolder(outputName, DRIVE_FOLDER_ID);
 
   // Use the first sheet in the newly created spreadsheet as the output sheet.
   const outputSheet = outputSpreadsheet.getSheets()[0];
@@ -89,7 +84,14 @@ function buildChatterLinkedInSheet() {
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
         const linkedinValue = String(row[linkedinIdx] ?? '').trim();
-        if (!linkedinValue) continue;
+
+        // if (!linkedinValue) continue;
+
+        // linkedinValue is blank, so try to find it in the members sheet
+        if (!linkedinValue) {
+          // TODO: implement cross reference to members sheet if the linkedinValue is empty
+          
+        }
 
         const normalizedRow = {
           sourceFileDate: fileInfo.fileDate,
@@ -259,7 +261,7 @@ function collectMatchingFilesRecursive_(folder, results) {
  * Returns a Date object, or null if the title does not start with a valid date.
  */
 function extractDateFromTitle_(title) {
-  const match = title.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const match = title.match(DATE_PREFIX);
   if (!match) return null;
 
   const year = parseInt(match[1], 10);

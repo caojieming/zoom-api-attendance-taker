@@ -9,7 +9,7 @@ const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone", " | ", " SoCal", ", ", ":
 const PARTICIPANT_MIN_NAME_LENGTH = 2;
 
 // Names containing any of these substrings are excluded entirely.
-const PARTICIPANT_BLACKLIST = ["notetaker", "read.ai"];
+const PARTICIPANT_BLACKLIST = ["calendly", "notetaker", "nоtеtаkеr", "read.ai"];
 
 // If true, exact duplicate participant names are merged into one row.
 const MERGE_DUPES = true;
@@ -56,7 +56,6 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 
   // Keep only meetings that match our filter rules.
   const filteredMeetings = meetings.filter(filterMeeting);
-  console.log("bleh");
 
   // Process each meeting one by one.
   filteredMeetings.forEach((meeting) => {
@@ -366,50 +365,4 @@ function writeMeetingSheet(sheet, meeting, rawUuid, participants) {
   // Write meeting metadata block starting two columns after participant table.
   sheet.getRange(1, participantHeaders.length + 2, 1, detailsHeaders.length).setValues([detailsHeaders]);
   sheet.getRange(2, participantHeaders.length + 2, 1, detailsRow.length).setValues([detailsRow]);
-}
-
-
-/**
- * Returns decimal similarity between two strings.
- * Example: 0.9 means 90% similar.
- */
-function stringSimilarity(s1, s2) {
-  const longer = s1.length >= s2.length ? s1 : s2;
-  const shorter = s1.length < s2.length ? s1 : s2;
-  const longerLength = longer.length;
-
-  if (longerLength === 0) return 1.0;
-
-  return (longerLength - editDistance(longer, shorter)) / longerLength;
-}
-/**
- * Computes Levenshtein distance between two strings.
- * Lower value = more similar strings.
- */
-function editDistance(s1, s2) {
-  s1 = s1.toLowerCase();
-  s2 = s2.toLowerCase();
-
-  const costs = new Array(s2.length + 1);
-
-  for (let i = 0; i <= s1.length; i++) {
-    let lastValue = i;
-
-    for (let j = 0; j <= s2.length; j++) {
-      if (i === 0) {
-        costs[j] = j;
-      } else if (j > 0) {
-        let newValue = costs[j - 1];
-        if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
-          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-        }
-        costs[j - 1] = lastValue;
-        lastValue = newValue;
-      }
-    }
-
-    if (i > 0) costs[s2.length] = lastValue;
-  }
-
-  return costs[s2.length];
 }
