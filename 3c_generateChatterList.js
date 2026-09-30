@@ -3,7 +3,7 @@ const MONTHS_BACK = 6;
 
 // Output columns.
 // linkedin_url is the unique ID column.
-const REQUIRED_COLUMNS = ['source_file_date', 'name', 'chapter', 'linkedin_url'];
+const REQUIRED_COLUMNS = ['latest_date', 'name', 'chapter', 'linkedin_url'];
 
 
 /**
@@ -49,6 +49,10 @@ function buildChatterLinkedInSheet() {
   const rowByLinkedin = new Map();
   let sourceHeaders = null;
 
+  // get contents of full members list for crossreferencing if certain info is missing
+  const columnNamesFilter = ["FirstName", "LastName", "Chapter", "LinkedIn"];
+  const fullMembersList = getTableFromSheet_(MEMBERS_SPREADSHEET_ID, MEMBERS_SPREADSHEET_SHEETNAME, columnNamesFilter);
+
   matchingFiles.forEach(function(fileInfo) {
     try {
       const ss = SpreadsheetApp.openById(fileInfo.id);
@@ -83,24 +87,43 @@ function buildChatterLinkedInSheet() {
         // Skip malformed rows.
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
-        const linkedinValue = String(row[linkedinIdx] ?? '').trim();
+        const baseNameVal = String(row[nameIdx] ?? '').trim();
+        let listNameVal = "";
+        const baseChapterVal = String(row[chapterIdx] ?? '').trim();
+        let listChapterVal = "";
+        const baseLinkedinVal = String(row[linkedinIdx] ?? '').trim().toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
+        let listLinkedinVal = "";
 
-        // if (!linkedinValue) continue;
-
-        // linkedinValue is blank, so try to find it in the members sheet
-        if (!linkedinValue) {
-          // TODO: implement cross reference to members sheet if the linkedinValue is empty
-          
+        // chapterValue is blank, so try to find it in the members sheet
+        if (!baseChapterVal || !baseLinkedinVal) {
+          for(const member of fullMembersList) {
+            const memberFullName = member.FirstName + " " + member.LastName;
+            if(stringSimilarity(baseNameVal, memberFullName) >= SIMILARITY_THRESHOLD_PERCENTAGE) {
+              listNameVal = memberFullName;
+              listChapterVal = member.Chapter;
+              listLinkedinVal = (member.LinkedIn).toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
+              break;
+            }
+          }
         }
+        // For the above, may want to implement a safer similarity system, one that goes through all members (does not exit early), making a list of objects that keeps track of all members with similarity >= 0.8 (storing all original variables + similarity decimal/percentage), then after the loop, choosing the member with the highest similarity to set listChapterVal and listLinkedinVal
+        // if the new list is empty (no names above 80% similarity), do nothing.
+
+        // const normalizedRow = {
+        //   sourceFileDate: fileInfo.fileDate,
+        //   name: row[nameIdx],
+        //   chapter: row[chapterIdx],
+        //   linkedin_url: row[linkedinIdx],
+        // };
 
         const normalizedRow = {
           sourceFileDate: fileInfo.fileDate,
-          name: row[nameIdx],
-          chapter: row[chapterIdx],
-          linkedin_url: row[linkedinIdx],
+          name: listNameVal || baseNameVal,
+          chapter: listChapterVal || baseChapterVal,
+          linkedin_url: listLinkedinVal || baseLinkedinVal,
         };
 
-        mergeRowByUniqueLinkedin_(rowByLinkedin, linkedinValue, normalizedRow);
+        mergeRowByUniqueLinkedin_(rowByLinkedin, normalizedRow.linkedin_url, normalizedRow);
       }
     } catch (err) {
       // Skip unreadable or broken files instead of failing the whole run.
@@ -197,6 +220,7 @@ function mergeRowByUniqueLinkedin_(rowByLinkedin, linkedinKey, incomingRow) {
     existingRow.linkedin_url = incomingRow.linkedin_url;
   }
 }
+
 
 /**
  * Chooses the longer non-blank name.
@@ -302,3 +326,36 @@ function isWithinLastMonths_(date, monthsBack) {
 function isBlank_(value) {
   return String(value ?? '').trim() === '';
 }
+
+
+/**
+ * returns a google sheet as a list of objects, optionally taking in a list of column names to filter in
+ */
+function getTableFromSheet_(spreadsheetId, sheetName, columnNames) {
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(String);
+  const useColumns = Array.isArray(columnNames) && columnNames.length > 0
+    ? columnNames.map(String)
+    : headers;
+
+  const indexes = useColumns.map(name => {
+    const idx = headers.indexOf(name);
+    if (idx === -1) throw new Error(`Column not found: ${name}`);
+    return idx;
+  });
+
+  return data.slice(1).map(row => {
+    const obj = {};
+    indexes.forEach((idx, i) => {
+      obj[useColumns[i]] = row[idx];
+    });
+    return obj;
+  });
+}
+
