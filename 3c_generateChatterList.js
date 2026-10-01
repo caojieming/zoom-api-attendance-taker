@@ -87,35 +87,48 @@ function buildChatterLinkedInSheet() {
         // Skip malformed rows.
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
+        // name found in chat participant sheet
         const baseNameVal = String(row[nameIdx] ?? '').trim();
+        // name found in full members list sheet (same for the below)
         let listNameVal = "";
         const baseChapterVal = String(row[chapterIdx] ?? '').trim();
         let listChapterVal = "";
         const baseLinkedinVal = String(row[linkedinIdx] ?? '').trim().toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
         let listLinkedinVal = "";
 
-        // chapterValue is blank, so try to find it in the members sheet
-        if (!baseChapterVal || !baseLinkedinVal) {
-          for(const member of fullMembersList) {
-            const memberFullName = member.FirstName + " " + member.LastName;
-            if(stringSimilarity(baseNameVal, memberFullName) >= SIMILARITY_THRESHOLD_PERCENTAGE) {
-              listNameVal = memberFullName;
-              listChapterVal = member.Chapter;
-              listLinkedinVal = (member.LinkedIn).toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
-              break;
-            }
+        // list of all members with names above 80% similarity
+        const similarNamedMembers = [];
+
+        // try to find relevant existing member info in fullMembersList
+        for(const member of fullMembersList) {
+          const memberFullName = member.FirstName.trim() + " " + member.LastName.trim();
+          const similarityRatio = stringSimilarity(baseNameVal, memberFullName);
+          if(similarityRatio >= SIMILARITY_THRESHOLD_RATIO) {
+            const curNameVal = memberFullName;
+            const curChapterVal = member.Chapter;
+            const curLinkedinVal = (member.LinkedIn).toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
+            
+            const curSimilarNamedMember = {
+              name: curNameVal,
+              chapter: curChapterVal,
+              linkedin_url: curLinkedinVal,
+              similarity_ratio: similarityRatio,
+            };
+
+            similarNamedMembers.push(curSimilarNamedMember);
           }
         }
-        // For the above, may want to implement a safer similarity system, one that goes through all members (does not exit early), making a list of objects that keeps track of all members with similarity >= 0.8 (storing all original variables + similarity decimal/percentage), then after the loop, choosing the member with the highest similarity to set listChapterVal and listLinkedinVal
-        // if the new list is empty (no names above 80% similarity), do nothing.
 
-        // const normalizedRow = {
-        //   sourceFileDate: fileInfo.fileDate,
-        //   name: row[nameIdx],
-        //   chapter: row[chapterIdx],
-        //   linkedin_url: row[linkedinIdx],
-        // };
+        // get most member with highest similarity
+        let mostSimilarMember = null;
+        for (const curMember of similarNamedMembers) {
+          if (!mostSimilarMember || curMember.similarity_ratio > mostSimilarMember.similarity_ratio) mostSimilarMember = curMember;
+        }
+        listNameVal = mostSimilarMember?.name ?? "";
+        listChapterVal = mostSimilarMember?.chapter ?? "";
+        listLinkedinVal = mostSimilarMember?.linkedin_url ?? "";
 
+        // prioritize using info obtained from fullMembersList to keep all values as consistent as possible for later dupe merging
         const normalizedRow = {
           sourceFileDate: fileInfo.fileDate,
           name: listNameVal || baseNameVal,

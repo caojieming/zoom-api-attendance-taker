@@ -18,7 +18,7 @@ const MERGE_DUPES = true;
 const MERGE_SIMILAR = true;
 
 // Similarity threshold for merging near-duplicate names.
-const SIMILARITY_THRESHOLD_PERCENTAGE = 0.8;
+const SIMILARITY_THRESHOLD_RATIO = 0.8;
 
 
 /**
@@ -246,7 +246,7 @@ function sanitizeParticipants(participants) {
       }
 
       // Merge near-duplicates using similarity score.
-      if (MERGE_SIMILAR && stringSimilarity(cur.name, past.name) >= SIMILARITY_THRESHOLD_PERCENTAGE) {
+      if (MERGE_SIMILAR && stringSimilarity(cur.name, past.name) >= SIMILARITY_THRESHOLD_RATIO) {
         past.name = cur.name;
         past.leave_time = cur.leave_time;
         past.duration += Number(cur.duration || 0);
