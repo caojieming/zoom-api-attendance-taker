@@ -47,94 +47,110 @@ function buildChatterLinkedInSheet() {
   // Build a map keyed by linkedin_url.
   // Each value stores the most recent row, with older rows used to backfill missing values.
   const rowByLinkedin = new Map();
+
+  // Cache source column indexes once instead of looking them up repeatedly.
   let sourceHeaders = null;
+  let nameIdx = -1;
+  let chapterIdx = -1;
+  let linkedinIdx = -1;
 
-  // get contents of full members list for crossreferencing if certain info is missing
+  // Get contents of full members list for cross-referencing if certain info is missing.
   const columnNamesFilter = ["FirstName", "LastName", "Chapter", "LinkedIn"];
-  const fullMembersList = getTableFromSheet_(MEMBERS_SPREADSHEET_ID, MEMBERS_SPREADSHEET_SHEETNAME, columnNamesFilter);
+  const fullMembersList = getTableFromSheet_(
+    MEMBERS_SPREADSHEET_ID,
+    MEMBERS_SPREADSHEET_SHEETNAME,
+    columnNamesFilter
+  ) || [];
 
-  matchingFiles.forEach(function(fileInfo) {
+  // Precompute normalized member records once instead of redoing string cleanup for every source row (better performance when there are many chat participant rows)
+  const normalizedMembers = fullMembersList
+    .map(member => {
+      const firstName = String(member.FirstName ?? '').trim();
+      const lastName = String(member.LastName ?? '').trim();
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      return {
+        name: fullName,
+        chapter: String(member.Chapter ?? '').trim(),
+        linkedin_url: normalizeLinkedInUrl_(member.LinkedIn),
+      };
+    })
+    .filter(member => member.name);
+
+  // loop through all spreadsheets that contain "Chat Participants" in their title
+  for (let fileIndex = 0; fileIndex < matchingFiles.length; fileIndex++) {
+    const fileInfo = matchingFiles[fileIndex];
+
     try {
+      // One SpreadsheetApp open call per source file is unavoidable, so keep the rest of the work local.
       const ss = SpreadsheetApp.openById(fileInfo.id);
       console.log(`Looking at spreadsheet '${ss.getName()}'`);
 
       // Assumes data is on the first sheet.
       const sheet = ss.getSheets()[0];
-      if (!sheet) return;
+      if (!sheet) continue;
 
+      // One data-range read per file.
       const data = sheet.getDataRange().getValues();
 
       // Skip empty sheets.
-      if (!data || data.length === 0) return;
+      if (!data || data.length === 0) continue;
 
       // Use the first non-empty sheet's header row.
       if (!sourceHeaders) {
         sourceHeaders = data[0].map(h => String(h).trim().toLowerCase());
+
+        nameIdx = sourceHeaders.indexOf('name');
+        chapterIdx = sourceHeaders.indexOf('chapter');
+        linkedinIdx = sourceHeaders.indexOf('linkedin_url');
+
+        if (nameIdx === -1 || chapterIdx === -1 || linkedinIdx === -1) {
+          throw new Error('Missing one or more required columns: name, chapter, linkedin_url');
+        }
       }
 
-      const nameIdx = sourceHeaders.indexOf('name');
-      const chapterIdx = sourceHeaders.indexOf('chapter');
-      const linkedinIdx = sourceHeaders.indexOf('linkedin_url');
-
-      if (nameIdx === -1 || chapterIdx === -1 || linkedinIdx === -1) {
-        throw new Error('Missing one or more required columns: name, chapter, linkedin_url');
-      }
-
-      // Process each data row.
+      // Process each data row (ignoring the first because it's the header row)
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
 
         // Skip malformed rows.
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
-        // name found in chat participant sheet
-        const baseNameVal = String(row[nameIdx] ?? '').trim();
-        // name found in full members list sheet (same for the below)
-        let listNameVal = "";
-        const baseChapterVal = String(row[chapterIdx] ?? '').trim();
-        let listChapterVal = "";
-        const baseLinkedinVal = String(row[linkedinIdx] ?? '').trim().toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
-        let listLinkedinVal = "";
+        const sourceName = String(row[nameIdx] ?? '').trim();
+        const sourceChapter = String(row[chapterIdx] ?? '').trim();
+        const sourceLinkedinUrl = normalizeLinkedInUrl_(row[linkedinIdx]);
 
-        // list of all members with names above 80% similarity
-        const similarNamedMembers = [];
+        // Track only the best matching member instead of storing every above-threshold match.
+        let bestMatch = null;
 
-        // try to find relevant existing member info in fullMembersList
-        for(const member of fullMembersList) {
-          const memberFullName = member.FirstName.trim() + " " + member.LastName.trim();
-          const similarityRatio = stringSimilarity(baseNameVal, memberFullName);
-          if(similarityRatio >= SIMILARITY_THRESHOLD_RATIO) {
-            const curNameVal = memberFullName;
-            const curChapterVal = member.Chapter;
-            const curLinkedinVal = (member.LinkedIn).toLowerCase().replace("https://", "").replace("www.", "").replace(/\/$/, "");
-            
-            const curSimilarNamedMember = {
-              name: curNameVal,
-              chapter: curChapterVal,
-              linkedin_url: curLinkedinVal,
-              similarity_ratio: similarityRatio,
-            };
+        // Try to find relevant existing member info in fullMembersList.
+        for (let m = 0; m < normalizedMembers.length; m++) {
+          const member = normalizedMembers[m];
+          const similarityRatio = stringSimilarity(sourceName, member.name);
 
-            similarNamedMembers.push(curSimilarNamedMember);
+          if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO) {
+            if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
+              bestMatch = {
+                name: member.name,
+                chapter: member.chapter,
+                linkedin_url: member.linkedin_url,
+                similarity_ratio: similarityRatio,
+              };
+            }
           }
         }
 
-        // get most member with highest similarity
-        let mostSimilarMember = null;
-        for (const curMember of similarNamedMembers) {
-          if (!mostSimilarMember || curMember.similarity_ratio > mostSimilarMember.similarity_ratio) mostSimilarMember = curMember;
-        }
-        listNameVal = mostSimilarMember?.name ?? "";
-        listChapterVal = mostSimilarMember?.chapter ?? "";
-        listLinkedinVal = mostSimilarMember?.linkedin_url ?? "";
-
-        // prioritize using info obtained from fullMembersList to keep all values as consistent as possible for later dupe merging
+        // Prioritize info obtained from fullMembersList to keep values as consistent as possible for later duplicate merging.
         const normalizedRow = {
           sourceFileDate: fileInfo.fileDate,
-          name: listNameVal || baseNameVal,
-          chapter: listChapterVal || baseChapterVal,
-          linkedin_url: listLinkedinVal || baseLinkedinVal,
+          name: bestMatch?.name || sourceName,
+          chapter: bestMatch?.chapter || sourceChapter,
+          linkedin_url: bestMatch?.linkedin_url || sourceLinkedinUrl,
         };
+
+        // Skip rows that still have no key after normalization.
+        // Might remove this later to allow rows without linkedin urls, just remember to also alter mergeRowByUniqueLinkedin_() to ignore rows with empty linkedin urls
+        if (!normalizedRow.linkedin_url) continue;
 
         mergeRowByUniqueLinkedin_(rowByLinkedin, normalizedRow.linkedin_url, normalizedRow);
       }
@@ -142,7 +158,7 @@ function buildChatterLinkedInSheet() {
       // Skip unreadable or broken files instead of failing the whole run.
       console.warn(`Skipping file '${fileInfo.name}': ${err}`);
     }
-  });
+  }
 
   // Convert the map into output rows.
   const outputRows = [REQUIRED_COLUMNS];
@@ -155,9 +171,10 @@ function buildChatterLinkedInSheet() {
     ]);
   });
 
-  // Write the final output.
+  // Write the final output
   outputSheet.clearContents();
-  outputSheet.getRange(1, 1, outputRows.length, REQUIRED_COLUMNS.length).setValues(outputRows);
+  const outputRange = outputSheet.getRange(1, 1, outputRows.length, REQUIRED_COLUMNS.length);
+  outputRange.setValues(outputRows);
 
   // Format the source date column nicely.
   if (outputRows.length > 1) {
@@ -173,13 +190,29 @@ function buildChatterLinkedInSheet() {
     existingFilter.remove();
   }
 
-  // Add a filter for the full table.
-  outputSheet.getRange(1, 1, outputSheet.getLastRow(), outputSheet.getLastColumn()).createFilter();
+  // Add a filter only when there is actual data beyond the header row.
+  // This avoids an unnecessary filter call on empty outputs.
+  if (outputRows.length > 1) {
+    outputSheet.getRange(1, 1, outputSheet.getLastRow(), outputSheet.getLastColumn()).createFilter();
+  }
 
   // Auto-resize columns.
   resizeColumnsToFit(outputSheet);
 
   Logger.log('Comprehensive sheet created');
+}
+
+
+/**
+ * Normalizes LinkedIn URLs into a consistent key format.
+ */
+function normalizeLinkedInUrl_(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '');
 }
 
 
