@@ -11,8 +11,8 @@ const REQUIRED_COLUMNS = ['latest_date', 'name', 'chapter', 'linkedin_url'];
  * found in DRIVE_FOLDER_ID and its subfolders.
  *
  * Rules:
- * - linkedin_url is the unique key.
- * - If the same linkedin_url appears multiple times, keep the most recent row.
+ * - full name is the unique key.
+ * - If the same full name appears multiple times, keep the most recent row.
  * - If the most recent row is missing a value that an older row has, backfill it.
  */
 function buildChatterLinkedInSheet() {
@@ -44,9 +44,9 @@ function buildChatterLinkedInSheet() {
     return a.name.localeCompare(b.name);
   });
 
-  // Build a map keyed by linkedin_url.
+  // Build a map keyed by full name.
   // Each value stores the most recent row, with older rows used to backfill missing values.
-  const rowByLinkedin = new Map();
+  const rowByName = new Map();
 
   // Cache source column indexes once instead of looking them up repeatedly.
   let sourceHeaders = null;
@@ -116,7 +116,19 @@ function buildChatterLinkedInSheet() {
         // Skip malformed rows.
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
-        const sourceName = String(row[nameIdx] ?? '').trim();
+        const sourceName = normalizeParticipantName(String(row[nameIdx] ?? '').trim());
+
+        // Skip rows with empty names or names that are too short
+        if (!sourceName || sourceName.length < PARTICIPANT_MIN_NAME_LENGTH) continue;
+
+        // skip rows with names that are part of the blacklist
+        if (
+          PARTICIPANT_BLACKLIST.length > 0 &&
+          PARTICIPANT_BLACKLIST.some((keyword) =>
+            sourceName.toLowerCase().includes(keyword.toLowerCase())
+          )
+        ) continue;
+
         const sourceChapter = String(row[chapterIdx] ?? '').trim();
         const sourceLinkedinUrl = normalizeLinkedInUrl_(row[linkedinIdx]);
 
@@ -149,10 +161,10 @@ function buildChatterLinkedInSheet() {
         };
 
         // Skip rows that still have no key after normalization.
-        // Might remove this later to allow rows without linkedin urls, just remember to also alter mergeRowByUniqueLinkedin_() to ignore rows with empty linkedin urls
-        if (!normalizedRow.linkedin_url) continue;
+        // Might remove this later to allow rows without names, just remember to also alter mergeRowByUniqueName_() to ignore rows with empty names
+        if (!normalizedRow.name) continue;
 
-        mergeRowByUniqueLinkedin_(rowByLinkedin, normalizedRow.linkedin_url, normalizedRow);
+        mergeRowByUniqueName_(rowByName, normalizedRow.name, normalizedRow);
       }
     } catch (err) {
       // Skip unreadable or broken files instead of failing the whole run.
@@ -162,7 +174,7 @@ function buildChatterLinkedInSheet() {
 
   // Convert the map into output rows.
   const outputRows = [REQUIRED_COLUMNS];
-  rowByLinkedin.forEach(function(item) {
+  rowByName.forEach(function(item) {
     outputRows.push([
       item.sourceFileDate,
       item.name,
@@ -210,27 +222,27 @@ function normalizeLinkedInUrl_(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/\/$/, '');
+    .replace(/^https?:\/\//, '') // remove "https://"
+    .replace(/^www\./, '') // remove "www."
+    .replace(/\/$/, ''); // remove trailing '/'
 }
 
 
 /**
- * Merges a row into the unique-linkedin map.
+ * Merges a row into the unique-name map.
  *
  * Rules:
- * - If the linkedin_url is new, store it.
+ * - If the full name is new, store it.
  * - If it already exists and the incoming row is newer, replace the stored row,
  *   but backfill any missing fields from the older row.
  * - If the incoming row is older, only backfill missing fields in the stored newer row.
  */
-function mergeRowByUniqueLinkedin_(rowByLinkedin, linkedinKey, incomingRow) {
-  const existingRow = rowByLinkedin.get(linkedinKey);
+function mergeRowByUniqueName_(rowByName, nameKey, incomingRow) {
+  const existingRow = rowByName.get(nameKey);
 
-  // First time we've seen this linkedin_url: store it.
+  // First time we've seen this full name: store it.
   if (!existingRow) {
-    rowByLinkedin.set(linkedinKey, incomingRow);
+    rowByName.set(nameKey, incomingRow);
     return;
   }
 
@@ -240,9 +252,10 @@ function mergeRowByUniqueLinkedin_(rowByLinkedin, linkedinKey, incomingRow) {
   // Incoming row is newer: make it the primary row,
   // but backfill any missing fields from the older row.
   if (incomingTime > existingTime) {
-    rowByLinkedin.set(linkedinKey, {
+    rowByName.set(nameKey, {
       sourceFileDate: incomingRow.sourceFileDate,
       name: chooseLongerName_(incomingRow.name, existingRow.name),
+      // name: existingRow.name,
       chapter: isBlank_(incomingRow.chapter) ? existingRow.chapter : incomingRow.chapter,
       linkedin_url: incomingRow.linkedin_url || existingRow.linkedin_url,
     });
@@ -252,6 +265,7 @@ function mergeRowByUniqueLinkedin_(rowByLinkedin, linkedinKey, incomingRow) {
   // Existing row is newer: keep it, but backfill any missing fields from the older row.
   if (incomingTime < existingTime) {
     existingRow.name = chooseLongerName_(existingRow.name, incomingRow.name);
+    // existingRow.name = existingRow.name;
     existingRow.chapter = isBlank_(existingRow.chapter) ? incomingRow.chapter : existingRow.chapter;
     if (isBlank_(existingRow.linkedin_url)) {
       existingRow.linkedin_url = incomingRow.linkedin_url;
@@ -261,6 +275,7 @@ function mergeRowByUniqueLinkedin_(rowByLinkedin, linkedinKey, incomingRow) {
 
   // Same date: merge missing values, and prefer the longer name.
   existingRow.name = chooseLongerName_(existingRow.name, incomingRow.name);
+  // existingRow.name = existingRow.name;
   existingRow.chapter = isBlank_(existingRow.chapter) ? incomingRow.chapter : existingRow.chapter;
   if (isBlank_(existingRow.linkedin_url)) {
     existingRow.linkedin_url = incomingRow.linkedin_url;
