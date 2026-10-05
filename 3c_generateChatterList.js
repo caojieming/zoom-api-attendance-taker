@@ -138,9 +138,9 @@ function buildChatterLinkedInSheet() {
         // Try to find relevant existing member info in fullMembersList.
         for (let m = 0; m < normalizedMembers.length; m++) {
           const member = normalizedMembers[m];
-          const similarityRatio = stringSimilarity_(sourceName.toLowerCase(), (member.name).toLowerCase());
+          const similarityRatio = stringSimilarity_(sourceName, member.name);
           // name from full members list first, name from chat list second
-          const isSubsequence = isSubsequence_((member.name).toLowerCase(), sourceName.toLowerCase());
+          const isSubsequence = isSubsequence_(member.name, sourceName);
 
           if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
             if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {

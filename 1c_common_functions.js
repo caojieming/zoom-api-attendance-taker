@@ -268,6 +268,10 @@ function createSpreadsheetInFolder_(sheetName, folderId) {
  * Example: 0.9 means 90% similar.
  */
 function stringSimilarity_(s1, s2) {
+  // remove all non alphabet characters, convert all characters to lowercase
+  s1 = s1.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  s2 = s2.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  
   const longer = s1.length >= s2.length ? s1 : s2;
   const shorter = s1.length < s2.length ? s1 : s2;
   const longerLength = longer.length;
@@ -281,10 +285,6 @@ function stringSimilarity_(s1, s2) {
  * Lower value = more similar strings.
  */
 function editDistance_(s1, s2) {
-  // remove all non alphabet characters, convert all characters to lowercase
-  s1 = s1.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  s2 = s2.replace(/[^a-zA-Z]/g, '').toLowerCase();
-
   const costs = new Array(s2.length + 1);
 
   for (let i = 0; i <= s1.length; i++) {
@@ -315,6 +315,8 @@ function editDistance_(s1, s2) {
  * subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
  */
 function isSubsequence_(mainString, partString) {
+  mainString = mainString.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  partString = partString.replace(/[^a-zA-Z]/g, '').toLowerCase();
   let i = 0, j = 0;
   while (i < mainString.length && j < partString.length) {
     if (mainString[i] === partString[j]) j++;
