@@ -27,7 +27,7 @@ function buildChatterLinkedInSheet() {
   }
 
   // Create the new output spreadsheet in DRIVE_FOLDER_ID.
-  const outputSpreadsheet = createSpreadsheetInFolder(outputName, DRIVE_FOLDER_ID);
+  const outputSpreadsheet = createSpreadsheetInFolder_(outputName, DRIVE_FOLDER_ID);
 
   // Use the first sheet in the newly created spreadsheet as the output sheet.
   const outputSheet = outputSpreadsheet.getSheets()[0];
@@ -116,7 +116,7 @@ function buildChatterLinkedInSheet() {
         // Skip malformed rows.
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
-        const sourceName = normalizeParticipantName(String(row[nameIdx] ?? '').trim());
+        const sourceName = normalizeParticipantName_(String(row[nameIdx] ?? '').trim());
 
         // Skip rows with empty names or names that are too short
         if (!sourceName || sourceName.length < PARTICIPANT_MIN_NAME_LENGTH) continue;
@@ -138,7 +138,7 @@ function buildChatterLinkedInSheet() {
         // Try to find relevant existing member info in fullMembersList.
         for (let m = 0; m < normalizedMembers.length; m++) {
           const member = normalizedMembers[m];
-          const similarityRatio = stringSimilarity(sourceName, member.name);
+          const similarityRatio = stringSimilarity_(sourceName, member.name);
 
           if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO) {
             if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
@@ -209,7 +209,7 @@ function buildChatterLinkedInSheet() {
   }
 
   // Auto-resize columns.
-  resizeColumnsToFit(outputSheet);
+  resizeColumnsToFit_(outputSheet);
 
   Logger.log('Comprehensive sheet created');
 }

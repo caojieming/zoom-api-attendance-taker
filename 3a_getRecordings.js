@@ -17,9 +17,9 @@ function getRecordingsHalfYear() {
  */
 function getRecordings(dateFrom = FROM, dateTo = TO) {
   const accessToken = getZoomAccessToken(ACCOUNT_ID, RECORDINGS_CLIENT_ID, RECORDINGS_CLIENT_SECRET);
-  const existingFilenames = getExistingFilenameSet(DRIVE_FOLDER_ID);
+  const existingFilenames = getExistingFilenameSet_(DRIVE_FOLDER_ID);
 
-  const meetings = fetchHistoricalMeetings(accessToken, dateFrom, dateTo);
+  const meetings = fetchHistoricalMeetings_(accessToken, dateFrom, dateTo);
 
   const filteredMeetings = meetings.filter(function (meeting) {
 
@@ -37,7 +37,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
 
     // optional check/filter if only looking for meetings on the fourth thursday of the month
     const startTime = meeting.start_time || "";
-    if(ONLY_FOURTH_THURS && !isFourthThursday(startTime)) {
+    if(ONLY_FOURTH_THURS && !isFourthThursday_(startTime)) {
       return false;
     }
 
@@ -46,19 +46,19 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
 
   // 2. Iterate through filtered list of meetings for recordings
   filteredMeetings.forEach(function (meeting) {
-    const startTime = convertPlainToISO(meeting.start_time) || "";
-    const datetime = convertISOTimeZone(startTime);
+    const startTime = convertPlainToISO_(meeting.start_time) || "";
+    const datetime = convertISOTimeZone_(startTime);
 
     const meetingUuid = meeting.meeting_uuid;
-    const meetingUuidEncoded = prepareUuid(meetingUuid);
+    const meetingUuidEncoded = prepareUuid_(meetingUuid);
 
     // GET /meetings/{meetingId}/recordings
     const recordingsUrl = `https://api.zoom.us/v2/meetings/${meetingUuidEncoded}/recordings`;
     const summaryUrl = `https://api.zoom.us/v2/meetings/${meetingUuidEncoded}/meeting_summary`;
 
-    const rawRecordingsData = httpGetData(recordingsUrl, accessToken, datetime);
+    const rawRecordingsData = httpGetData_(recordingsUrl, accessToken, datetime);
 
-    // check code from httpGetData
+    // check code from httpGetData_
     if(rawRecordingsData.code === 200) {
       const recordingsData = JSON.parse(rawRecordingsData.data);
 
@@ -76,7 +76,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
           }
 
           const downloadUrl = file.download_url;
-          const rawTranscript = httpGetData(downloadUrl, accessToken);
+          const rawTranscript = httpGetData_(downloadUrl, accessToken);
           let transcript = rawTranscript.data;
           // just removes the excessive number of extra newlines in the transcript
           transcript = transcript.replace(/\n/g, '');
@@ -87,7 +87,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
           }
           else {
             console.log("Downloading/Importing: " + fileName);
-            createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, transcript);
+            createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, transcript);
             existingFilenames.add(fileName);
           }
           
@@ -113,7 +113,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
           }
 
           const downloadUrl = file.download_url;
-          const rawChatLog = httpGetData(downloadUrl, accessToken);
+          const rawChatLog = httpGetData_(downloadUrl, accessToken);
           const chatLog = rawChatLog.data;
           
           // Skip if a file with this name already exists in the folder
@@ -122,7 +122,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
           }
           else {
             console.log("Downloading/Importing: " + fileName);
-            createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, chatLog);
+            createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, chatLog);
             existingFilenames.add(fileName);
           }
 
@@ -139,9 +139,9 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
       });
     }
 
-    const rawSummaryData = httpGetData(summaryUrl, accessToken, datetime);
+    const rawSummaryData = httpGetData_(summaryUrl, accessToken, datetime);
 
-    // check code from httpGetData
+    // check code from httpGetData_
     if(rawSummaryData.code === 200) {
       const fileName = datetime + " [Summary]";
       // Skip if a file with this name already exists in the folder
@@ -152,7 +152,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
         const summaryData = JSON.parse(rawSummaryData.data);
         const summaryText = summaryData.summary_content;
         console.log("Downloading/Importing: " + fileName);
-        createGoogleDocInFolder(DRIVE_FOLDER_ID, fileName, summaryText);
+        createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, summaryText);
         existingFilenames.add(fileName);
       }
     }
@@ -162,7 +162,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
   });
 
   // moves all loose files into date folders
-  organizeFilesByDate(DRIVE_FOLDER_ID);
+  organizeFilesByDate_(DRIVE_FOLDER_ID);
 }
 
 
@@ -170,7 +170,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
  * Loops through all files in rootFolderId, and if their name starts with a date in the format "YYYY-MM-DD", then the function moves that file into the folder with the same date name.
  * If that date folder doesn't exist, the function creates it before moving the file into it
  */
-function organizeFilesByDate(rootFolderId) {
+function organizeFilesByDate_(rootFolderId) {
   const rootFolder = DriveApp.getFolderById(rootFolderId);
   const files = rootFolder.getFiles();
 
@@ -213,7 +213,7 @@ function organizeFilesByDate(rootFolderId) {
 /**
  * Fetch historical meetings with pagination.
  */
-function fetchHistoricalMeetings(accessToken, inFrom, inTo) {
+function fetchHistoricalMeetings_(accessToken, inFrom, inTo) {
   const meetings = [];
   let nextMeetingPageToken = "";
 
@@ -261,7 +261,7 @@ function fetchHistoricalMeetings(accessToken, inFrom, inTo) {
  * Returns a Set of all file names already in the target folder.
  * also recursively traverses all subfolders for file names
  */
-function getExistingFilenameSet(folderId) {
+function getExistingFilenameSet_(folderId) {
   const folder = DriveApp.getFolderById(folderId);
   const names = new Set();
 
@@ -285,7 +285,7 @@ function getExistingFilenameSet(folderId) {
 /**
  * generic get data from a link/API endpoint (use if you don't care for custom error messages/actions)
  */
-function httpGetData(url, accessToken, id = "") {
+function httpGetData_(url, accessToken, id = "") {
   const options = {
     method: "get",
     headers: {
@@ -307,7 +307,7 @@ function httpGetData(url, accessToken, id = "") {
 /**
  * creates a google doc with a specific name, specific content, and in a specific drive folder
  */
-function createGoogleDocInFolder(driveFolderId, docName, docContent) {
+function createGoogleDocInFolder_(driveFolderId, docName, docContent) {
   const folder = DriveApp.getFolderById(driveFolderId);
 
   const doc = DocumentApp.create(docName);

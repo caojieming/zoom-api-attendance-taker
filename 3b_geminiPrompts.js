@@ -33,7 +33,7 @@ ${transcript}
 `;
 
   // Delegate all shared work to the generic helper.
-  return createExtractionSheet({
+  return createExtractionSheet_({
     driveFolderId,
     fileName,
     prompt,
@@ -95,7 +95,7 @@ ${chatLog}
 `;
 
   // Delegate all shared work to the generic helper.
-  return createExtractionSheet({
+  return createExtractionSheet_({
     driveFolderId,
     fileName,
     prompt,
@@ -116,7 +116,7 @@ ${chatLog}
 
 
 // Generic extraction runner shared by both use cases.
-function createExtractionSheet({
+function createExtractionSheet_({
   driveFolderId,
   fileName,
   prompt,
@@ -126,11 +126,11 @@ function createExtractionSheet({
   countKey
 }) {
   // Create the spreadsheet and use its first sheet as the output destination.
-  const spreadsheet = createSpreadsheetInFolder(fileName, driveFolderId);
+  const spreadsheet = createSpreadsheetInFolder_(fileName, driveFolderId);
   const sheet = spreadsheet.getSheets()[0];
 
   // Send the prompt to Gemini and parse the JSON response.
-  const parsed = callGeminiJson(prompt);
+  const parsed = callGeminiJson_(prompt);
 
   // Pull out the expected array from the returned JSON.
   const items = Array.isArray(parsed[rootKey]) ? parsed[rootKey] : [];
@@ -139,7 +139,7 @@ function createExtractionSheet({
   const rows = items.map(rowMapper);
 
   // Write the final table to the sheet.
-  writeTableToSheet(sheet, headers, rows);
+  writeTableToSheet_(sheet, headers, rows);
 
   // Return useful metadata about the generated spreadsheet.
   return {
@@ -151,7 +151,7 @@ function createExtractionSheet({
 
 
 // Calls Gemini and returns parsed JSON, retrying only on transient "high traffic" style failures.
-function callGeminiJson(prompt) {
+function callGeminiJson_(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
   const payload = {
@@ -240,7 +240,7 @@ function callGeminiJson(prompt) {
 
 
 // Writes a simple tabular dataset into the first sheet of the spreadsheet.
-function writeTableToSheet(sheet, headers, rows) {
+function writeTableToSheet_(sheet, headers, rows) {
   // Prepend the header row to the data rows.
   const values = [headers, ...rows];
 
@@ -260,5 +260,5 @@ function writeTableToSheet(sheet, headers, rows) {
   sheet.getRange(1, 1, values.length, headers.length).createFilter();
 
   // Auto-fit columns to the content.
-  resizeColumnsToFit(sheet);
+  resizeColumnsToFit_(sheet);
 }

@@ -11,9 +11,9 @@ If you only want to change recordings/transcripts getter code, please see all fi
 
 function archivePastMonth() {
   getParticipants(ONE_MONTH_AGO, NOW);
-  goToSheet(BASE_SHEET_NAME);
+  goToSheet_(BASE_SHEET_NAME);
   sortRecords();
-  goToSheet(BASE_SHEET_NAME);
+  goToSheet_(BASE_SHEET_NAME);
   rankAttendance();
 
   getRecordings(ONE_MONTH_AGO, NOW);
@@ -26,9 +26,9 @@ function archivePastMonth() {
  */
 function archivePastHalfYear() {
   getParticipantsHalfYear();
-  goToSheet(BASE_SHEET_NAME);
+  goToSheet_(BASE_SHEET_NAME);
   sortRecords();
-  goToSheet(BASE_SHEET_NAME);
+  goToSheet_(BASE_SHEET_NAME);
   rankAttendance();
 
   getRecordingsHalfYear();

@@ -55,7 +55,7 @@ function getZoomAccessToken(accountId, clientId, clientSecret) {
  * @param {string|Date} isoDate
  * @returns {boolean}
  */
-function isFourthThursday(isoDate) {
+function isFourthThursday_(isoDate) {
   const date = new Date(isoDate);
   if (isNaN(date.getTime())) return false;
 
@@ -72,7 +72,7 @@ function isFourthThursday(isoDate) {
  * @param {number} value
  * @returns {string}
  */
-function pad2(value) {
+function pad2_(value) {
   return String(value).padStart(2, '0');
 }
 
@@ -82,7 +82,7 @@ function pad2(value) {
  * @param {number|string} minutes
  * @returns {string}
  */
-function minutesToHM(minutes) {
+function minutesToHM_(minutes) {
   const n = parseFloat(minutes);
   if (!isFinite(n)) return '00h 00m';
 
@@ -90,7 +90,7 @@ function minutesToHM(minutes) {
   const hours = Math.floor(total / 60);
   const mins = total % 60;
 
-  return `${pad2(hours)}h ${pad2(mins)}m`;
+  return `${pad2_(hours)}h ${pad2_(mins)}m`;
 }
 
 
@@ -99,7 +99,7 @@ function minutesToHM(minutes) {
  * @param {number|string} seconds
  * @returns {string}
  */
-function secondsToHMS(seconds) {
+function secondsToHMS_(seconds) {
   const n = parseFloat(seconds);
   if (!isFinite(n)) return '00h 00m 00s';
 
@@ -108,7 +108,7 @@ function secondsToHMS(seconds) {
   const mins = Math.floor((total % 3600) / 60);
   const secs = total % 60;
 
-  return `${pad2(hours)}h ${pad2(mins)}m ${pad2(secs)}s`;
+  return `${pad2_(hours)}h ${pad2_(mins)}m ${pad2_(secs)}s`;
 }
 
 
@@ -116,7 +116,7 @@ function secondsToHMS(seconds) {
  * Resizes all populated columns in a sheet to fit their content.
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  */
-function resizeColumnsToFit(sheet) {
+function resizeColumnsToFit_(sheet) {
   const dataRange = sheet.getDataRange();
   const numColumns = dataRange.getNumColumns();
 
@@ -135,7 +135,7 @@ function resizeColumnsToFit(sheet) {
  * @param {string} plainDT
  * @returns {string}
  */
-function convertPlainToISO(plainDT) {
+function convertPlainToISO_(plainDT) {
   if (!plainDT) return '';
 
   const value = String(plainDT).trim();
@@ -151,7 +151,7 @@ function convertPlainToISO(plainDT) {
  * @param {string} newTimeZone
  * @returns {string}
  */
-function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
+function convertISOTimeZone_(iso, newTimeZone = 'America/Los_Angeles') {
   const date = new Date(iso);
   if (isNaN(date.getTime())) return '';
 
@@ -181,11 +181,11 @@ function convertISOTimeZone(iso, newTimeZone = 'America/Los_Angeles') {
 
 
 /**
- * Extracts only the time portion from a datetime string produced by convertISOTimeZone().
+ * Extracts only the time portion from a datetime string produced by convertISOTimeZone_().
  * @param {string} datetime
  * @returns {string}
  */
-function timeOnly(datetime) {
+function timeOnly_(datetime) {
   if (!datetime) return '';
 
   const index = datetime.indexOf(' ');
@@ -199,7 +199,7 @@ function timeOnly(datetime) {
  * @param {string} uuid
  * @returns {string}
  */
-function prepareUuid(uuid) {
+function prepareUuid_(uuid) {
   if (!uuid) return '';
 
   const value = String(uuid);
@@ -216,7 +216,7 @@ function prepareUuid(uuid) {
  * @param {number|string} days
  * @returns {string}
  */
-function daysAgo(days) {
+function daysAgo_(days) {
   const n = parseInt(days, 10);
   if (!isFinite(n)) return '';
 
@@ -229,7 +229,7 @@ function daysAgo(days) {
  * Switches the active spreadsheet tab to the sheet with the given name.
  * @param {string} sheetName
  */
-function goToSheet(sheetName) {
+function goToSheet_(sheetName) {
   if (!sheetName) return;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -247,7 +247,7 @@ function goToSheet(sheetName) {
  * @param {string} folderId
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
  */
-function createSpreadsheetInFolder(sheetName, folderId) {
+function createSpreadsheetInFolder_(sheetName, folderId) {
   if (!sheetName || !folderId) {
     throw new Error('Missing sheetName or folderId.');
   }
@@ -267,20 +267,20 @@ function createSpreadsheetInFolder(sheetName, folderId) {
  * Returns decimal similarity between two strings.
  * Example: 0.9 means 90% similar.
  */
-function stringSimilarity(s1, s2) {
+function stringSimilarity_(s1, s2) {
   const longer = s1.length >= s2.length ? s1 : s2;
   const shorter = s1.length < s2.length ? s1 : s2;
   const longerLength = longer.length;
 
   if (longerLength === 0) return 1.0;
 
-  return (longerLength - editDistance(longer, shorter)) / longerLength;
+  return (longerLength - editDistance_(longer, shorter)) / longerLength;
 }
 /**
  * Computes Levenshtein distance between two strings.
  * Lower value = more similar strings.
  */
-function editDistance(s1, s2) {
+function editDistance_(s1, s2) {
   // remove all non alphabet characters, convert all characters to lowercase
   s1 = s1.replace(/[^a-zA-Z]/g, '').toLowerCase();
   s2 = s2.replace(/[^a-zA-Z]/g, '').toLowerCase();

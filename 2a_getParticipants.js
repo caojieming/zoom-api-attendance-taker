@@ -52,41 +52,41 @@ function getParticipants(inFrom = FROM, inTo = TO) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Fetch all meetings from Zoom for the requested date range.
-  const meetings = fetchAllMeetings(accessToken, inFrom, inTo);
+  const meetings = fetchAllMeetings_(accessToken, inFrom, inTo);
 
   // Keep only meetings that match our filter rules.
-  const filteredMeetings = meetings.filter(filterMeeting);
+  const filteredMeetings = meetings.filter(filterMeeting_);
 
   // Process each meeting one by one.
   filteredMeetings.forEach((meeting) => {
     const rawUuid = meeting.meeting_uuid;
 
     // use meeting start time as the sheet nameu
-    const sheetName = convertISOTimeZone(convertPlainToISO(meeting.start_time) || "");
+    const sheetName = convertISOTimeZone_(convertPlainToISO_(meeting.start_time) || "");
 
     // skip if sheet already exists
     if (!sheetName || ss.getSheetByName(sheetName)) return;
 
     // get all participants for this meeting
-    const participants = fetchAllParticipants(accessToken, rawUuid);
+    const participants = fetchAllParticipants_(accessToken, rawUuid);
 
     // clean and merge participant records
-    const sanitizedParticipants = sanitizeParticipants(participants);
+    const sanitizedParticipants = sanitizeParticipants_(participants);
 
     // skip meetings with 0 or 1 remaining participants after cleanup
     if (sanitizedParticipants.length <= 1) return;
 
     // insert the new sheet in the correct position
-    insertSheetBeforeAttendanceSheets(ss, sheetName);
+    insertSheetBeforeAttendanceSheets_(ss, sheetName);
 
     // grab the newly created sheet
     const newSheet = ss.getSheetByName(sheetName);
 
     // write meeting + participant data into the sheet
-    writeMeetingSheet(newSheet, meeting, rawUuid, sanitizedParticipants);
+    writeMeetingSheet_(newSheet, meeting, rawUuid, sanitizedParticipants);
 
     // auto-fit columns for readability
-    resizeColumnsToFit(newSheet);
+    resizeColumnsToFit_(newSheet);
   });
 }
 
@@ -94,7 +94,7 @@ function getParticipants(inFrom = FROM, inTo = TO) {
 /**
  * Fetches all historical meetings from Zoom using pagination.
  */
-function fetchAllMeetings(accessToken, from, to) {
+function fetchAllMeetings_(accessToken, from, to) {
   let meetings = [];
   let nextPageToken = "";
 
@@ -139,10 +139,10 @@ function fetchAllMeetings(accessToken, from, to) {
 /**
  * Fetches all participants for one meeting UUID using pagination.
  */
-function fetchAllParticipants(accessToken, rawUuid) {
+function fetchAllParticipants_(accessToken, rawUuid) {
   let participants = [];
   let nextPageToken = "";
-  const encodedUuid = prepareUuid(rawUuid);
+  const encodedUuid = prepareUuid_(rawUuid);
 
   do {
     // Build request URL for participant list.
@@ -177,7 +177,7 @@ function fetchAllParticipants(accessToken, rawUuid) {
 /**
  * Returns true only if the meeting passes the configured filters.
  */
-function filterMeeting(meeting) {
+function filterMeeting_(meeting) {
   const meetingId = meeting.meeting_id;
 
   // If a specific meeting ID is set, only keep that meeting.
@@ -187,7 +187,7 @@ function filterMeeting(meeting) {
   if (Number(meeting.participants) <= 5) return false;
 
   // Optional filter: only include meetings held on the fourth Thursday.
-  if (ONLY_FOURTH_THURS && !isFourthThursday(meeting.start_time || "")) return false;
+  if (ONLY_FOURTH_THURS && !isFourthThursday_(meeting.start_time || "")) return false;
 
   return true;
 }
@@ -196,7 +196,7 @@ function filterMeeting(meeting) {
 /**
  * Cleans participant names and merges duplicates/similar entries.
  */
-function sanitizeParticipants(participants) {
+function sanitizeParticipants_(participants) {
   const sanitized = [];
 
   participants.forEach((p) => {
@@ -215,7 +215,7 @@ function sanitizeParticipants(participants) {
     }
 
     // Remove extra text like device names, locations, etc.
-    const name = normalizeParticipantName(originalName);
+    const name = normalizeParticipantName_(originalName);
 
     // Skip empty or too-short results after cleanup.
     if (!name || name.length < PARTICIPANT_MIN_NAME_LENGTH) return;
@@ -246,7 +246,7 @@ function sanitizeParticipants(participants) {
       }
 
       // Merge near-duplicates using similarity score.
-      if (MERGE_SIMILAR && stringSimilarity(cur.name, past.name) >= SIMILARITY_THRESHOLD_RATIO) {
+      if (MERGE_SIMILAR && stringSimilarity_(cur.name, past.name) >= SIMILARITY_THRESHOLD_RATIO) {
         past.name = cur.name;
         past.leave_time = cur.leave_time;
         past.duration += Number(cur.duration || 0);
@@ -267,7 +267,7 @@ function sanitizeParticipants(participants) {
 /**
  * Removes trailing extra text from participant names using the configured delimiters.
  */
-function normalizeParticipantName(name) {
+function normalizeParticipantName_(name) {
   let result = name;
 
   // Apply each delimiter in order.
@@ -283,7 +283,7 @@ function normalizeParticipantName(name) {
  * Inserts the new sheet before the first date-named sheet,
  * so attendance sheets stay grouped together.
  */
-function insertSheetBeforeAttendanceSheets(ss, sheetName) {
+function insertSheetBeforeAttendanceSheets_(ss, sheetName) {
   const sheets = ss.getSheets();
 
   // Default: insert at the end if no date-named sheet is found.
@@ -304,7 +304,7 @@ function insertSheetBeforeAttendanceSheets(ss, sheetName) {
 /**
  * Writes the meeting details and participant table to the sheet.
  */
-function writeMeetingSheet(sheet, meeting, rawUuid, participants) {
+function writeMeetingSheet_(sheet, meeting, rawUuid, participants) {
   const meetingId = meeting.meeting_id;
   const topic = meeting.topic || "Untitled Meeting";
   const duration = Number(meeting.duration || 0);
@@ -312,10 +312,10 @@ function writeMeetingSheet(sheet, meeting, rawUuid, participants) {
   const hostEmail = meeting.host_email || "";
 
   // Convert timestamps into the format used in the sheet.
-  const startTime = convertPlainToISO(meeting.start_time) || "";
-  const endTime = convertPlainToISO(meeting.end_time) || "";
-  const convertedStartTime = convertISOTimeZone(startTime);
-  const convertedEndTime = convertISOTimeZone(endTime);
+  const startTime = convertPlainToISO_(meeting.start_time) || "";
+  const endTime = convertPlainToISO_(meeting.end_time) || "";
+  const convertedStartTime = convertISOTimeZone_(startTime);
+  const convertedEndTime = convertISOTimeZone_(endTime);
 
   // Column headers for the participant table.
   const participantHeaders = ["name", "join_time", "leave_time", "duration", "rejoined"];
@@ -336,9 +336,9 @@ function writeMeetingSheet(sheet, meeting, rawUuid, participants) {
   // Convert participant objects into sheet rows.
   const participantRows = participants.map((p) => [
     p.name || "",
-    timeOnly(convertISOTimeZone(p.join_time)) || "",
-    timeOnly(convertISOTimeZone(p.leave_time)) || "",
-    secondsToHMS(Number(p.duration || 0)) || "",
+    timeOnly_(convertISOTimeZone_(p.join_time)) || "",
+    timeOnly_(convertISOTimeZone_(p.leave_time)) || "",
+    secondsToHMS_(Number(p.duration || 0)) || "",
     p.timesRejoined,
   ]);
 
@@ -350,9 +350,9 @@ function writeMeetingSheet(sheet, meeting, rawUuid, participants) {
     hostDisplayName,
     hostEmail,
     participants.length,
-    minutesToHM(duration),
-    timeOnly(convertedStartTime),
-    timeOnly(convertedEndTime),
+    minutesToHM_(duration),
+    timeOnly_(convertedStartTime),
+    timeOnly_(convertedEndTime),
   ];
 
   // Write participant headers and rows starting in column A.

@@ -13,15 +13,15 @@ const DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})/;
 
 // helper constants used for setting FROM and TO times
 const NOW = new Date().toISOString().split('T')[0]; // Today (YYYY-MM-DD)
-const ONE_DAY_AGO = daysAgo(1);
-const THREE_DAYS_AGO = daysAgo(3);
-const ONE_WEEK_AGO = daysAgo(7);
-const ONE_MONTH_AGO = daysAgo(30);
-const TWO_MONTHS_AGO = daysAgo(60);
-const THREE_MONTHS_AGO = daysAgo(90);
-const FOUR_MONTHS_AGO = daysAgo(120);
-const FIVE_MONTHS_AGO = daysAgo(150);
-const SIX_MONTHS_AGO = daysAgo(180);
+const ONE_DAY_AGO = daysAgo_(1);
+const THREE_DAYS_AGO = daysAgo_(3);
+const ONE_WEEK_AGO = daysAgo_(7);
+const ONE_MONTH_AGO = daysAgo_(30);
+const TWO_MONTHS_AGO = daysAgo_(60);
+const THREE_MONTHS_AGO = daysAgo_(90);
+const FOUR_MONTHS_AGO = daysAgo_(120);
+const FIVE_MONTHS_AGO = daysAgo_(150);
+const SIX_MONTHS_AGO = daysAgo_(180);
 
 
 // request constants, these are sent to Zoom API as part of the request

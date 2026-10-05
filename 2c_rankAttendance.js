@@ -89,7 +89,7 @@ function rankAttendance() {
 
   // merge similar names
   if (typeof MERGE_SIMILAR !== "undefined" && MERGE_SIMILAR) {
-    participants = mergeSimilarParticipants(participants);
+    participants = mergeSimilarParticipants_(participants);
   }
 
   // 3) Rank by attendance rate (no tie-break beyond name)
@@ -131,15 +131,15 @@ function rankAttendance() {
     rankedSheet.getRange(1, 1, rows.length + 1, header.length).createFilter();
   }
 
-  resizeColumnsToFit(rankedSheet);
+  resizeColumnsToFit_(rankedSheet);
 }
 
 
 /**
  * helper function to merge similar participants
  */
-function mergeSimilarParticipants(participants) {
-  // Merge participants that satisfy stringSimilarity() >= MERGE_SIMILAR_PERCENTAGE
+function mergeSimilarParticipants_(participants) {
+  // Merge participants that satisfy stringSimilarity_() >= MERGE_SIMILAR_PERCENTAGE
   // Also merge participants when one name is directly contained in the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long.
   // For direct containment, only merge when the shorter name is a whole word or a prefix of the longer name, not just any substring match. Choose the longest name as the main name.
   // merged attended = sum of all attended
@@ -171,13 +171,13 @@ function mergeSimilarParticipants(participants) {
 
         const shorterLen = shorter.length;
         const wholeWord =
-          new RegExp(`(^|\\s)${escapeRegExp(shorter)}($|\\s)`).test(longer);
+          new RegExp(`(^|\\s)${escapeRegExp_(shorter)}($|\\s)`).test(longer);
         const prefix = longer.startsWith(shorter);
 
         const directlyContains = shorterLen >= PARTIAL_NAME_THRESHOLD && (wholeWord || prefix);
 
         const similar =
-          stringSimilarity(nameA, nameB) >= MERGE_SIMILAR_PERCENTAGE;
+          stringSimilarity_(nameA, nameB) >= MERGE_SIMILAR_PERCENTAGE;
 
         if (directlyContains || similar) {
           groupIdx.push(j);
@@ -225,6 +225,6 @@ function mergeSimilarParticipants(participants) {
 /**
  * Escape special regex characters in a string.
  */
-function escapeRegExp(str) {
+function escapeRegExp_(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
