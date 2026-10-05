@@ -116,7 +116,7 @@ function buildChatterLinkedInSheet() {
         // Skip malformed rows.
         if (!row || row.length <= Math.max(nameIdx, chapterIdx, linkedinIdx)) continue;
 
-        const sourceName = normalizeParticipantName_(String(row[nameIdx] ?? '').trim());
+        const sourceName = normalizeParticipantName_(String(row[nameIdx] ?? ''));
 
         // Skip rows with empty names or names that are too short
         if (!sourceName || sourceName.length < PARTICIPANT_MIN_NAME_LENGTH) continue;
@@ -138,9 +138,11 @@ function buildChatterLinkedInSheet() {
         // Try to find relevant existing member info in fullMembersList.
         for (let m = 0; m < normalizedMembers.length; m++) {
           const member = normalizedMembers[m];
-          const similarityRatio = stringSimilarity_(sourceName, member.name);
+          const similarityRatio = stringSimilarity_(sourceName.toLowerCase(), (member.name).toLowerCase());
+          // name from full members list first, name from chat list second
+          const isSubsequence = isSubsequence_((member.name).toLowerCase(), sourceName.toLowerCase());
 
-          if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO) {
+          if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
             if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
               bestMatch = {
                 name: member.name,

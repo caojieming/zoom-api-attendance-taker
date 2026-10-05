@@ -308,3 +308,18 @@ function editDistance_(s1, s2) {
 
   return costs[s2.length];
 }
+
+
+/**
+ * return true if partString is a subsequence of mainString
+ * subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
+ */
+function isSubsequence_(mainString, partString) {
+  let i = 0, j = 0;
+  while (i < mainString.length && j < partString.length) {
+    if (mainString[i] === partString[j]) j++;
+    i++;
+  }
+  // If j reaches end of partString, that means all characters of partString were found in mainString
+  return j === partString.length;
+}
