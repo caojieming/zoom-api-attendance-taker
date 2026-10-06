@@ -3,7 +3,7 @@
 // Delimiters that indicate a participant name contains extra text
 // (e.g. device names, locations, punctuation, etc.)
 // Everything from the delimiter onward is removed
-const PARTICIPANT_DELIMITERS = [" - ", " (", "iPhone", " | ", " SoCal", ", ", ": ", " SaaS ", "’s iPad"];
+const PARTICIPANT_DELIMITERS = [" - ", " (", " | ", " SoCal", ", ", ": ", " SaaS ", "’s iPhone", "’s iPad", "iPhone"];
 
 // Minimum allowed length for a participant name after cleanup.
 const PARTICIPANT_MIN_NAME_LENGTH = 2;
@@ -57,6 +57,28 @@ function getParticipants(inFrom = FROM, inTo = TO) {
   // Keep only meetings that match our filter rules.
   const filteredMeetings = meetings.filter(filterMeeting_);
 
+  // Get contents of full members list for cross-referencing to try to get full names and chapters
+  const columnNamesFilter = ["FirstName", "LastName", "Chapter"];
+  const uncleanFullMembersList = getTableFromSheet_(
+    MEMBERS_SPREADSHEET_ID,
+    MEMBERS_SPREADSHEET_SHEETNAME,
+    columnNamesFilter
+  ) || [];
+
+  // Precompute normalized member records once instead of redoing string cleanup for every source row (better performance when there are many chat participant rows)
+  const normalizedMembersList = uncleanFullMembersList.map(member => {
+      const firstName = String(member.FirstName ?? '').trim();
+      const lastName = String(member.LastName ?? '').trim();
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      return {
+        name: fullName,
+        chapter: String(member.Chapter ?? '').trim(),
+      };
+    })
+    .filter(member => member.name);
+
+
   // Process each meeting one by one.
   filteredMeetings.forEach((meeting) => {
     const rawUuid = meeting.meeting_uuid;
@@ -70,8 +92,8 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     // get all participants for this meeting
     const participants = fetchAllParticipants_(accessToken, rawUuid);
 
-    // clean and merge participant records
-    const sanitizedParticipants = sanitizeParticipants_(participants);
+    // clean and merge participant records, also cross reference with full members list for matched names and chapters
+    const sanitizedParticipants = sanitizeParticipants_(participants, normalizedMembersList);
 
     // skip meetings with 0 or 1 remaining participants after cleanup
     if (sanitizedParticipants.length <= 1) return;
@@ -196,7 +218,7 @@ function filterMeeting_(meeting) {
 /**
  * Cleans participant names and merges duplicates/similar entries.
  */
-function sanitizeParticipants_(participants) {
+function sanitizeParticipants_(participants, fullMembersList) {
   const sanitized = [];
 
   participants.forEach((p) => {
@@ -215,14 +237,38 @@ function sanitizeParticipants_(participants) {
     }
 
     // Remove extra text like device names, locations, etc.
-    const name = normalizeParticipantName_(originalName);
+    const curName = normalizeParticipantName_(originalName);
 
     // Skip empty or too-short results after cleanup.
-    if (!name || name.length < PARTICIPANT_MIN_NAME_LENGTH) return;
+    if (!curName || curName.length < PARTICIPANT_MIN_NAME_LENGTH) return;
+
+
+    // cross reference full members list, add matched_name and matched_chapter if found
+    // Track only the best matching member
+    let bestMatch = null;
+    for (let m = 0; m < fullMembersList.length; m++) {
+      const listMember = fullMembersList[m];
+      const similarityRatio = stringSimilarity_(curName, listMember.name);
+      // name from full members list first, name from chat list second
+      const isSubsequence = isSubsequence_(listMember.name, curName);
+
+      if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
+        if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
+          bestMatch = {
+            matched_name: listMember.name,
+            matched_chapter: listMember.chapter,
+            similarity_ratio: similarityRatio,
+          };
+        }
+      }
+    }
+
 
     // Create a copy so we don't mutate the original Zoom API object.
     const cur = Object.assign({}, p, {
-      name,
+      name: curName,
+      matched_name: bestMatch?.matched_name || "",
+      matched_chapter: bestMatch?.matched_chapter || "",
       timesRejoined: 0,
     });
 
@@ -318,7 +364,15 @@ function writeMeetingSheet_(sheet, meeting, rawUuid, participants) {
   const convertedEndTime = convertISOTimeZone_(endTime);
 
   // Column headers for the participant table.
-  const participantHeaders = ["name", "join_time", "leave_time", "duration", "rejoined"];
+  const participantHeaders = [
+    "name",
+    "matched_name",
+    "matched_chapter",
+    "join_time",
+    "leave_time",
+    "duration",
+    "rejoined",
+  ];
 
   // Column headers for the meeting metadata block.
   const detailsHeaders = [
@@ -336,6 +390,8 @@ function writeMeetingSheet_(sheet, meeting, rawUuid, participants) {
   // Convert participant objects into sheet rows.
   const participantRows = participants.map((p) => [
     p.name || "",
+    p.matched_name || "",
+    p.matched_chapter || "",
     timeOnly_(convertISOTimeZone_(p.join_time)) || "",
     timeOnly_(convertISOTimeZone_(p.leave_time)) || "",
     secondsToHMS_(Number(p.duration || 0)) || "",

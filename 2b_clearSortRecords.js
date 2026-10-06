@@ -43,4 +43,6 @@ function sortRecords() {
     ss.setActiveSheet(sheet);
     ss.moveActiveSheet(index + 1);
   });
+  
+  goToSheet_(BASE_SHEET_NAME);
 }

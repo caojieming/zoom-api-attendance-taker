@@ -56,15 +56,14 @@ function buildChatterLinkedInSheet() {
 
   // Get contents of full members list for cross-referencing if certain info is missing.
   const columnNamesFilter = ["FirstName", "LastName", "Chapter", "LinkedIn"];
-  const fullMembersList = getTableFromSheet_(
+  const uncleanFullMembersList = getTableFromSheet_(
     MEMBERS_SPREADSHEET_ID,
     MEMBERS_SPREADSHEET_SHEETNAME,
     columnNamesFilter
   ) || [];
 
   // Precompute normalized member records once instead of redoing string cleanup for every source row (better performance when there are many chat participant rows)
-  const normalizedMembers = fullMembersList
-    .map(member => {
+  const normalizedMembersList = uncleanFullMembersList.map(member => {
       const firstName = String(member.FirstName ?? '').trim();
       const lastName = String(member.LastName ?? '').trim();
       const fullName = `${firstName} ${lastName}`.trim();
@@ -135,9 +134,9 @@ function buildChatterLinkedInSheet() {
         // Track only the best matching member instead of storing every above-threshold match.
         let bestMatch = null;
 
-        // Try to find relevant existing member info in fullMembersList.
-        for (let m = 0; m < normalizedMembers.length; m++) {
-          const member = normalizedMembers[m];
+        // Try to find relevant existing member info in fullMembersList (normalizedMembersList).
+        for (let m = 0; m < normalizedMembersList.length; m++) {
+          const member = normalizedMembersList[m];
           const similarityRatio = stringSimilarity_(sourceName, member.name);
           // name from full members list first, name from chat list second
           const isSubsequence = isSubsequence_(member.name, sourceName);
@@ -389,36 +388,3 @@ function isWithinLastMonths_(date, monthsBack) {
 function isBlank_(value) {
   return String(value ?? '').trim() === '';
 }
-
-
-/**
- * returns a google sheet as a list of objects, optionally taking in a list of column names to filter in
- */
-function getTableFromSheet_(spreadsheetId, sheetName, columnNames) {
-  const ss = SpreadsheetApp.openById(spreadsheetId);
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
-
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-
-  const headers = data[0].map(String);
-  const useColumns = Array.isArray(columnNames) && columnNames.length > 0
-    ? columnNames.map(String)
-    : headers;
-
-  const indexes = useColumns.map(name => {
-    const idx = headers.indexOf(name);
-    if (idx === -1) throw new Error(`Column not found: ${name}`);
-    return idx;
-  });
-
-  return data.slice(1).map(row => {
-    const obj = {};
-    indexes.forEach((idx, i) => {
-      obj[useColumns[i]] = row[idx];
-    });
-    return obj;
-  });
-}
-

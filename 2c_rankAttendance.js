@@ -139,7 +139,7 @@ function rankAttendance() {
  * helper function to merge similar participants
  */
 function mergeSimilarParticipants_(participants) {
-  // Merge participants that satisfy stringSimilarity_() >= MERGE_SIMILAR_PERCENTAGE
+  // Merge participants that satisfy stringSimilarity_() >= SIMILARITY_THRESHOLD_RATIO
   // Also merge participants when one name is directly contained in the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long.
   // For direct containment, only merge when the shorter name is a whole word or a prefix of the longer name, not just any substring match. Choose the longest name as the main name.
   // merged attended = sum of all attended
@@ -177,7 +177,7 @@ function mergeSimilarParticipants_(participants) {
         const directlyContains = shorterLen >= PARTIAL_NAME_THRESHOLD && (wholeWord || prefix);
 
         const similar =
-          stringSimilarity_(nameA, nameB) >= MERGE_SIMILAR_PERCENTAGE;
+          stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
 
         if (directlyContains || similar) {
           groupIdx.push(j);

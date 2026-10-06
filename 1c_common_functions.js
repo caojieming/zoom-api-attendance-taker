@@ -271,7 +271,7 @@ function stringSimilarity_(s1, s2) {
   // remove all non alphabet characters, convert all characters to lowercase
   s1 = s1.replace(/[^a-zA-Z]/g, '').toLowerCase();
   s2 = s2.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  
+
   const longer = s1.length >= s2.length ? s1 : s2;
   const shorter = s1.length < s2.length ? s1 : s2;
   const longerLength = longer.length;
@@ -324,4 +324,36 @@ function isSubsequence_(mainString, partString) {
   }
   // If j reaches end of partString, that means all characters of partString were found in mainString
   return j === partString.length;
+}
+
+
+/**
+ * returns a google sheet as a list of objects, optionally taking in a list of column names to filter in
+ */
+function getTableFromSheet_(spreadsheetId, sheetName, columnNames) {
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(String);
+  const useColumns = Array.isArray(columnNames) && columnNames.length > 0
+    ? columnNames.map(String)
+    : headers;
+
+  const indexes = useColumns.map(name => {
+    const idx = headers.indexOf(name);
+    if (idx === -1) throw new Error(`Column not found: ${name}`);
+    return idx;
+  });
+
+  return data.slice(1).map(row => {
+    const obj = {};
+    indexes.forEach((idx, i) => {
+      obj[useColumns[i]] = row[idx];
+    });
+    return obj;
+  });
 }
