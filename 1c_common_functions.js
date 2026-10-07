@@ -357,3 +357,43 @@ function getTableFromSheet_(spreadsheetId, sheetName, columnNames) {
     return obj;
   });
 }
+
+
+/**
+ * Extracts the leading YYYY-MM-DD date from a file title.
+ * Returns a Date object, or null if the title does not start with a valid date.
+ */
+function extractDateFromTitle_(title) {
+  const match = title.match(DATE_PREFIX);
+  if (!match) return null;
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10) - 1; // JS months are 0-based.
+  const day = parseInt(match[3], 10);
+
+  const fileDate = new Date(year, month, day);
+
+  // Validate the date components to avoid rollover dates like 2024-02-31.
+  if (
+    isNaN(fileDate.getTime()) ||
+    fileDate.getFullYear() !== year ||
+    fileDate.getMonth() !== month ||
+    fileDate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return fileDate;
+}
+
+
+/**
+ * Checks whether a date is within the last N months from now.
+ * Uses a calendar-month cutoff rather than a fixed number of days.
+ */
+function isWithinLastMonths_(date, monthsBack) {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - monthsBack);
+
+  return date >= cutoff;
+}

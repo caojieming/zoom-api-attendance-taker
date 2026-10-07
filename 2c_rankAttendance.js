@@ -1,5 +1,5 @@
-// if merging similar is enabled, merge participants when one name is directly contained in the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long
-const PARTIAL_NAME_THRESHOLD = 6;
+// if merging similar is enabled, merge participants when one name is a subsequence of the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long
+const PARTIAL_NAME_THRESHOLD = 5;
 
 
 /**
@@ -13,13 +13,22 @@ function rankAttendance() {
   const activeIndex = activeSheet.getIndex();
 
   // 1) Sheets to the right of active whose names start with a date
+  // Only include meetings within the last MONTHS_BACK months
   const meetingSheets = [];
   for (let i = 0; i < sheets.length; i++) {
     // getIndex() is 1-based, sheets[] is 0-based
     if (i + 1 <= activeIndex) continue;
 
-    const nm = sheets[i].getName().trim();
-    if (DATE_PREFIX.test(nm)) meetingSheets.push(sheets[i]);
+    const sheetName = sheets[i].getName().trim();
+    if (!DATE_PREFIX.test(sheetName)) continue;
+
+    // Use the helper methods to filter by date range
+    const meetingDate = extractDateFromTitle_(sheetName);
+    if (!meetingDate) continue;
+
+    if (isWithinLastMonths_(meetingDate, MONTHS_BACK)) {
+      meetingSheets.push(sheets[i]);
+    }
   }
 
   // Date label is the matching prefix only (YYYY-MM-DD)
@@ -53,6 +62,8 @@ function rankAttendance() {
     const numRows = lastRow - 1;
 
     const nameValues = sh.getRange(2, 1, numRows, 1).getValues(); // col A
+    const matchedNameValues = sh.getRange(2, 2, numRows, 1).getValues(); // col B
+    const matchedChapterValues = sh.getRange(2, 3, numRows, 1).getValues(); // col C
     const durationValues = sh.getRange(2, durationColIndex + 1, numRows, 1).getValues(); // "duration" col
 
     totalNumMeetings++;
@@ -60,18 +71,21 @@ function rankAttendance() {
     // go through each participant in the current sheet/meeting
     for (let r = 0; r < numRows; r++) {
       let name = (nameValues[r][0] ?? "").toString().trim(); // don't use .toLowerCase()
+      let matched_name = (matchedNameValues[r][0] ?? "").toString().trim();
+      let matched_chapter = (matchedChapterValues[r][0] ?? "").toString().trim();
 
       // should not ever happen, but just in case
       if (!name) continue;
 
-      // sanitize names, removing extra info that is not name related
-      name = name.split(" - ")[0].trim();
-      name = name.split(" (")[0].trim();
-
       const durStr = (durationValues[r][0] ?? "").toString().trim();
 
       if (!participantData[name]) {
-        participantData[name] = { attended: 0, durationsByDate: {} };
+        participantData[name] = {
+          matched_name: matched_name,
+          matched_chapter: matched_chapter,
+          attended: 0,
+          durationsByDate: {},
+        };
       }
 
       participantData[name].attended += 1;
@@ -83,8 +97,10 @@ function rankAttendance() {
   // participant objects: { name, attended, durationsByDate }
   let participants = Object.keys(participantData).map(name => ({
     name,
+    matched_name: participantData[name].matched_name,
+    matched_chapter: participantData[name].matched_chapter,
     attended: participantData[name].attended,
-    durationsByDate: participantData[name].durationsByDate
+    durationsByDate: participantData[name].durationsByDate,
   }));
 
   // merge similar names
@@ -109,14 +125,14 @@ function rankAttendance() {
   ss.setActiveSheet(rankedSheet);
   ss.moveActiveSheet(2);
 
-  const header = ["name", "rate", ...dates];
+  const header = ["name", "matched_name", "matched_chapter", "rate", ...dates];
 
   const rows = participants.map(p => {
     const attended = p.attended || 0;
     const rate = totalNumMeetings ? (attended / totalNumMeetings) : 0;
     const rateStr = totalNumMeetings ? (rate * 100).toFixed(2) + "%" : "";
 
-    const row = [p.name, rateStr];
+    const row = [p.name, p.matched_name, p.matched_chapter, rateStr];
     for (const dateLabel of dates) {
       const val = p.durationsByDate?.[dateLabel];
       row.push(val === undefined || val === null || val === "" ? "" : val);
@@ -130,6 +146,8 @@ function rankAttendance() {
   if (rows.length) {
     rankedSheet.getRange(1, 1, rows.length + 1, header.length).createFilter();
   }
+
+  rankedSheet.setFrozenRows(1);
 
   resizeColumnsToFit_(rankedSheet);
 }
@@ -163,23 +181,16 @@ function mergeSimilarParticipants_(participants) {
         const nameA = participants[baseIdx].name;
         const nameB = participants[j].name;
 
-        // Direct containment merge:
-        // only merge if the shorter name has at least PARTIAL_NAME_THRESHOLD characters
-        // and is either a whole word or a prefix of the longer name
         const shorter = nameA.length <= nameB.length ? nameA : nameB;
         const longer = nameA.length > nameB.length ? nameA : nameB;
 
-        const shorterLen = shorter.length;
-        const wholeWord =
-          new RegExp(`(^|\\s)${escapeRegExp_(shorter)}($|\\s)`).test(longer);
-        const prefix = longer.startsWith(shorter);
+        // shorter name is a direct subsequence to the longer name
+        // subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
+        const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
 
-        const directlyContains = shorterLen >= PARTIAL_NAME_THRESHOLD && (wholeWord || prefix);
+        const isSimilar = stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
 
-        const similar =
-          stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
-
-        if (directlyContains || similar) {
+        if (isSubsequence || isSimilar) {
           groupIdx.push(j);
           used[j] = true;
         }
@@ -213,18 +224,12 @@ function mergeSimilarParticipants_(participants) {
 
     mergedParticipants.push({
       name: participants[repIdx].name,
+      matched_name: participants[repIdx].matched_name,
+      matched_chapter: participants[repIdx].matched_chapter,
       attended: mergedAttended,
       durationsByDate: sortedDurationsByDate
     });
   }
 
   return mergedParticipants;
-}
-
-
-/**
- * Escape special regex characters in a string.
- */
-function escapeRegExp_(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

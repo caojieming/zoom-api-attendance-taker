@@ -107,6 +107,9 @@ function getParticipants(inFrom = FROM, inTo = TO) {
     // write meeting + participant data into the sheet
     writeMeetingSheet_(newSheet, meeting, rawUuid, sanitizedParticipants);
 
+    // freeze the header row
+    newSheet.setFrozenRows(1);
+
     // auto-fit columns for readability
     resizeColumnsToFit_(newSheet);
   });

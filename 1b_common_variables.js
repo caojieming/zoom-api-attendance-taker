@@ -57,3 +57,7 @@ Generally best to stick with the lite model, I've consistently run into high tra
 
 // name of the specific sheet in MEMBERS_SPREADSHEET_ID that has desired info
 const MEMBERS_SPREADSHEET_SHEETNAME = "Full Member List";
+
+// How far back to look into generated record history for multiple functions (attendance ranker, generate chatter list)
+const MONTHS_BACK = 6;
+
