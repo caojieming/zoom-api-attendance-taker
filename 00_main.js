@@ -10,13 +10,13 @@ If you only want to change recordings/transcripts getter code, please see all fi
 
 
 function archivePastMonth() {
-  getParticipants(ONE_MONTH_AGO, NOW);
+  getParticipants(FROM, TO);
   goToSheet_(BASE_SHEET_NAME);
   sortRecords();
   goToSheet_(BASE_SHEET_NAME);
   rankAttendance();
 
-  getRecordings(ONE_MONTH_AGO, NOW);
+  getRecordings(FROM, TO);
   buildChatterLinkedInSheet();
 }
 

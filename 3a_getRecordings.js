@@ -22,22 +22,24 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
   const meetings = fetchHistoricalMeetings_(accessToken, dateFrom, dateTo);
 
   const filteredMeetings = meetings.filter(function (meeting) {
+    // guard against malformed records, which should theoretically be impossible, but just in case
+    if (!meeting || !meeting.meeting_id) return false;
 
     // optional check/filter for meeting ID
     // if const MEETING_ID is filled/is not empty AND current meeting ID does not equal const MEETING_ID
     const meetingId = meeting.meeting_id.toString();
-    if(MEETING_ID !== "" && meetingId !== MEETING_ID) {
+    if (MEETING_ID !== "" && meetingId !== MEETING_ID) {
       return false;
     }
 
     // skip false/empty meetings (I assume meetings comprised of 5 or less total participants aren't meetings we're interested in)
-    if(Number(meeting.participants) <= 5) {
+    if (Number(meeting.participants) <= 5) {
       return false;
     }
 
     // optional check/filter if only looking for meetings on the fourth thursday of the month
     const startTime = meeting.start_time || "";
-    if(ONLY_FOURTH_THURS && !isFourthThursday_(startTime)) {
+    if (ONLY_FOURTH_THURS && !isFourthThursday_(startTime)) {
       return false;
     }
 
@@ -50,6 +52,12 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
     const datetime = convertISOTimeZone_(startTime);
 
     const meetingUuid = meeting.meeting_uuid;
+    // extra guard
+    if (!meetingUuid) {
+      console.warn("Skipping meeting with missing UUID: " + meeting.meeting_id);
+      return;
+    }
+
     const meetingUuidEncoded = prepareUuid_(meetingUuid);
 
     // GET /meetings/{meetingId}/recordings
@@ -59,110 +67,121 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
     const rawRecordingsData = httpGetData_(recordingsUrl, accessToken, datetime);
 
     // check code from httpGetData_
-    if(rawRecordingsData.code === 200) {
+    if (rawRecordingsData.code === 200) {
       const recordingsData = JSON.parse(rawRecordingsData.data);
 
       // loop through all recording_files, searching for file_type = TRANSCRIPT, MP4, CHAT -> place them in drive (see if they can be placed raw or as original files)
-      (recordingsData.recording_files || []).forEach(function(file) {
-        if(file.file_type === "TRANSCRIPT") {
-          const fileName = datetime + " [Transcript]";
-          const fileNameExists = existingFilenames.has(fileName);
-          const sheetName = datetime + " [Key Topics]";
-          const sheetNameExists = existingFilenames.has(sheetName);
-
-          // both file and sheet exist, exit this subfunction and move onto the next file
-          if(fileNameExists && sheetNameExists) {
-            return;
-          }
-
-          const downloadUrl = file.download_url;
-          const rawTranscript = httpGetData_(downloadUrl, accessToken);
-          let transcript = rawTranscript.data;
-          // just removes the excessive number of extra newlines in the transcript
-          transcript = transcript.replace(/\n/g, '');
-
-          // Skip if a file with this name already exists in the folder
-          if (fileNameExists) {
-            console.log("File already imported: " + fileName);
-          }
-          else {
-            console.log("Downloading/Importing: " + fileName);
-            createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, transcript);
-            existingFilenames.add(fileName);
-          }
-          
-          // create key topics sheet from transcript if it doesn't already exist
-          if(sheetNameExists) {
-            console.log("File already generated: " + sheetName);
-          }
-          else {
-            console.log("Generating: " + sheetName);
-            createKeyTopicsSheet(DRIVE_FOLDER_ID, sheetName, transcript);
-            existingFilenames.add(sheetName);
-          }
-        }
-        else if(file.file_type === "CHAT") {
-          const fileName = datetime + " [Chat Log]";
-          const fileNameExists = existingFilenames.has(fileName);
-          const sheetName = datetime + " [Chat Participants]";
-          const sheetNameExists = existingFilenames.has(sheetName);
-
-          // both file and sheet exist, exit this subfunction and move onto the next file
-          if(fileNameExists && sheetNameExists) {
-            return;
-          }
-
-          const downloadUrl = file.download_url;
-          const rawChatLog = httpGetData_(downloadUrl, accessToken);
-          const chatLog = rawChatLog.data;
-          
-          // Skip if a file with this name already exists in the folder
-          if (fileNameExists) {
-            console.log("File already imported: " + fileName);
-          }
-          else {
-            console.log("Downloading/Importing: " + fileName);
-            createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, chatLog);
-            existingFilenames.add(fileName);
-          }
-
-          // create chat participants sheet from chat logs if it doesn't already exist
-          if(sheetNameExists) {
-            console.log("File already generated: " + sheetName);
-          }
-          else {
-            console.log("Generating: " + sheetName);
-            createChatParticipantsSheet(DRIVE_FOLDER_ID, sheetName, chatLog);
-            existingFilenames.add(sheetName);
-          }
-        }
+      (recordingsData.recording_files || []).forEach(function (file) {
+        processRecordingFile_(file, accessToken, datetime, existingFilenames);
       });
     }
 
     const rawSummaryData = httpGetData_(summaryUrl, accessToken, datetime);
 
     // check code from httpGetData_
-    if(rawSummaryData.code === 200) {
+    if (rawSummaryData.code === 200) {
       const fileName = datetime + " [Summary]";
+
       // Skip if a file with this name already exists in the folder
       if (existingFilenames.has(fileName)) {
         console.log("File already imported: " + fileName);
       }
       else {
         const summaryData = JSON.parse(rawSummaryData.data);
-        const summaryText = summaryData.summary_content;
+        const summaryText = summaryData.summary_content || "";
         console.log("Downloading/Importing: " + fileName);
         createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, summaryText);
         existingFilenames.add(fileName);
       }
     }
 
-    // small timeout to prevent very specific errors
-    // Utilities.sleep(200);
   });
 
   // moves all loose files into date folders
-  organizeFilesByDate_(DRIVE_FOLDER_ID);
+  folderFilesByDate_(DRIVE_FOLDER_ID);
+}
+
+
+/**
+ * Handles individual Zoom recording files by file type.
+ * Keeps the main loop cleaner and avoids repeating the same import/check logic.
+ */
+function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
+  if (!file || !file.file_type) return;
+
+  if (file.file_type === "TRANSCRIPT") {
+    const fileName = datetime + " [Transcript]";
+    const fileNameExists = existingFilenames.has(fileName);
+    const sheetName = datetime + " [Key Topics]";
+    const sheetNameExists = existingFilenames.has(sheetName);
+
+    // both file and sheet exist, exit this subfunction and move onto the next file
+    if (fileNameExists && sheetNameExists) {
+      return;
+    }
+
+    const downloadUrl = file.download_url;
+    const rawTranscript = httpGetData_(downloadUrl, accessToken);
+    let transcript = rawTranscript.data;
+
+    // just removes the excessive number of extra newlines in the transcript
+    transcript = transcript.replace(/\n/g, '');
+
+    // Skip if a file with this name already exists in the folder
+    if (fileNameExists) {
+      console.log("File already imported: " + fileName);
+    }
+    else {
+      console.log("Downloading/Importing: " + fileName);
+      createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, transcript);
+      existingFilenames.add(fileName);
+    }
+
+    // create key topics sheet from transcript if it doesn't already exist
+    if (sheetNameExists) {
+      console.log("File already generated: " + sheetName);
+    }
+    else {
+      console.log("Generating: " + sheetName);
+      createKeyTopicsSheet(DRIVE_FOLDER_ID, sheetName, transcript);
+      existingFilenames.add(sheetName);
+    }
+  }
+  else if (file.file_type === "CHAT") {
+    const fileName = datetime + " [Chat Log]";
+    const fileNameExists = existingFilenames.has(fileName);
+    const sheetName = datetime + " [Chat Participants]";
+    const sheetNameExists = existingFilenames.has(sheetName);
+
+    // both file and sheet exist, exit this subfunction and move onto the next file
+    if (fileNameExists && sheetNameExists) {
+      return;
+    }
+
+    const downloadUrl = file.download_url;
+    const rawChatLog = httpGetData_(downloadUrl, accessToken);
+    const chatLog = rawChatLog.data;
+
+    // Skip if a file with this name already exists in the folder
+    if (fileNameExists) {
+      console.log("File already imported: " + fileName);
+    }
+    else {
+      console.log("Downloading/Importing: " + fileName);
+      createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, chatLog);
+      existingFilenames.add(fileName);
+    }
+
+    // create chat participants sheet from chat logs if it doesn't already exist
+    if (sheetNameExists) {
+      console.log("File already generated: " + sheetName);
+    }
+    else {
+      console.log("Generating: " + sheetName);
+      createChatParticipantsSheet(DRIVE_FOLDER_ID, sheetName, chatLog);
+      existingFilenames.add(sheetName);
+    }
+  }
 }
 
 
@@ -170,7 +189,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
  * Loops through all files in rootFolderId, and if their name starts with a date in the format "YYYY-MM-DD", then the function moves that file into the folder with the same date name.
  * If that date folder doesn't exist, the function creates it before moving the file into it
  */
-function organizeFilesByDate_(rootFolderId) {
+function folderFilesByDate_(rootFolderId) {
   const rootFolder = DriveApp.getFolderById(rootFolderId);
   const files = rootFolder.getFiles();
 
@@ -183,8 +202,6 @@ function organizeFilesByDate_(rootFolderId) {
     if (!match) continue;
 
     const dateFolderName = match[0];
-    // console.log(match);
-    // console.log(dateFolderName);
 
     // Find or create the date folder inside the root folder
     const folderIterator = rootFolder.getFoldersByName(dateFolderName);
@@ -247,7 +264,8 @@ function fetchHistoricalMeetings_(accessToken, inFrom, inTo) {
         meetings.push.apply(meetings, data.history_meetings);
       }
       nextMeetingPageToken = data.next_page_token || "";
-    } else {
+    }
+    else {
       console.error("Error fetching historical meetings. Code: " + responseCode + ", Response: " + response.getContentText());
       nextMeetingPageToken = ""; // Stop pagination on error
     }
@@ -293,13 +311,16 @@ function httpGetData_(url, accessToken, id = "") {
     },
     muteHttpExceptions: true
   };
+
   const res = UrlFetchApp.fetch(url, options);
   const code = res.getResponseCode();
   const data = res.getContentText();
+
   if (code < 200 || code >= 300) {
     // throw new Error(`HTTP code ${code} for ${url}, data: ${data}`);
     console.error(`[${id}]  HTTP code ${code}, data: ${data}`);
   }
+
   return { code: code, data: data };
 }
 
