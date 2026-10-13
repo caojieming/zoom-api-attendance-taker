@@ -264,6 +264,22 @@ function createSpreadsheetInFolder_(sheetName, folderId) {
 
 
 /**
+ * creates a google doc with a specific name, specific content, and in a specific drive folder
+ */
+function createGoogleDocInFolder_(driveFolderId, docName, docContent) {
+  const folder = DriveApp.getFolderById(driveFolderId);
+
+  const doc = DocumentApp.create(docName);
+  doc.getBody().setText(docContent);
+
+  const file = DriveApp.getFileById(doc.getId());
+  file.moveTo(folder); // puts the file in that folder
+
+  return doc.getId();
+}
+
+
+/**
  * Returns decimal similarity between two strings.
  * Example: 0.9 means 90% similar.
  */

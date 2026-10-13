@@ -51,6 +51,61 @@ ${transcript}
 
 
 /**
+ * creates a summary doc, following the format/logic of zoom summaries
+ */
+function createSummaryDoc(driveFolderId, fileName, transcript) {
+  // Prompt tells the model to generate a Zoom-style meeting summary in a clean doc-friendly format.
+  const prompt = `
+You are analyzing a meeting transcript and generating a Zoom-style meeting summary.
+
+Write the summary in a professional, concise format with these sections, in this exact order:
+
+Meeting Summary
+Key Points
+Decisions
+Action Items
+
+Rules:
+- Use plain text only.
+- Keep it concise but useful.
+- Mirror the style of a typical Zoom meeting summary: brief overview first, then bullet-style highlights.
+- "Meeting Summary" should be a short paragraph of 2-4 sentences.
+- "Key Points" should be 3-8 bullets covering the main discussion themes.
+- "Decisions" should be 0-5 bullets describing explicit decisions made.
+- "Action Items" should be 0-10 bullets describing follow-up tasks, ideally with owner and due date if mentioned.
+- If a section has nothing relevant, write "None".
+- Do not add markdown code fences.
+- Do not add extra commentary outside these sections.
+
+Use this exact output format:
+
+Meeting Summary
+<paragraph>
+
+Key Points
+- <bullet>
+- <bullet>
+
+Decisions
+- <bullet>
+
+Action Items
+- <bullet>
+
+Transcript:
+${transcript}
+`;
+
+  // Delegate the Gemini call and doc creation to a shared helper.
+  return createTextDocFromPrompt_({
+    driveFolderId,
+    fileName,
+    prompt
+  });
+}
+
+
+/**
  * creates a sheet listing the chat participants of a meeting by sending the chat log along with a prompt to Gemini
  */
 function createChatParticipantsSheet(driveFolderId, fileName, chatLog) {
@@ -150,6 +205,25 @@ function createExtractionSheet_({
 }
 
 
+/**
+ * Generic doc creator shared by doc-based Gemini outputs.
+ * This keeps the Gemini call and file creation logic consistent with the sheet flows.
+ */
+function createTextDocFromPrompt_({ driveFolderId, fileName, prompt }) {
+  // Send the prompt to Gemini and get plain text back.
+  const text = callGeminiText_(prompt);
+
+  // Create the Google Doc in the target folder with the generated content.
+  const docId = createGoogleDocInFolder_(driveFolderId, fileName, text);
+
+  // Return useful metadata about the generated document.
+  return {
+    docId: docId,
+    docUrl: `https://docs.google.com/document/d/${docId}/edit`
+  };
+}
+
+
 // Calls Gemini and returns parsed JSON, retrying only on transient "high traffic" style failures.
 function callGeminiJson_(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -238,6 +312,93 @@ function callGeminiJson_(prompt) {
 }
 
 
+/**
+ * Calls Gemini and returns plain text, retrying only on transient "high traffic" style failures.
+ */
+function callGeminiText_(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const payload = {
+    contents: [{
+      role: "user",
+      parts: [{ text: prompt }]
+    }],
+    generationConfig: {
+      temperature: 0.2,
+      topP: 0.95,
+      maxOutputTokens: 8192
+    }
+  };
+
+  const maxAttempts = 3;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = UrlFetchApp.fetch(url, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+
+      const status = response.getResponseCode();
+      const body = response.getContentText();
+
+      if (status < 200 || status >= 300) {
+        const errorText = (body || "").toLowerCase();
+
+        // Retry only on transient capacity/traffic-style errors.
+        const isTransient =
+          status === 429 ||
+          status === 503 ||
+          errorText.includes("high traffic") ||
+          errorText.includes("overloaded") ||
+          errorText.includes("try again") ||
+          errorText.includes("resource exhausted") ||
+          errorText.includes("temporarily unavailable");
+
+        if (isTransient) {
+          throw new Error(`Transient Gemini error (${status}): ${body}`);
+        }
+
+        // Fail immediately for non-transient errors.
+        throw new Error(`Gemini API error (${status}): ${body}`);
+      }
+
+      const data = JSON.parse(body);
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) throw new Error("No model output returned.");
+
+      return text;
+    } catch (err) {
+      lastError = err;
+
+      const message = String(err && err.message ? err.message : err);
+      const isTransient =
+        message.includes("Transient Gemini error") ||
+        message.includes("fetch failed") ||
+        message.includes("timeout") ||
+        message.includes("temporarily unavailable") ||
+        message.includes("high traffic") ||
+        message.includes("overloaded") ||
+        message.includes("resource exhausted");
+
+      // Retry only transient failures, and only if attempts remain.
+      if (isTransient && attempt < maxAttempts) {
+        Utilities.sleep(1000 * attempt); // 1s, then 2s backoff
+        continue;
+      }
+
+      // Stop immediately for non-transient failures.
+      throw err;
+    }
+  }
+
+  throw new Error(`Gemini request failed after ${maxAttempts} attempts: ${lastError.message}`);
+}
+
 
 // Writes a simple tabular dataset into the first sheet of the spreadsheet.
 function writeTableToSheet_(sheet, headers, rows) {
@@ -261,4 +422,30 @@ function writeTableToSheet_(sheet, headers, rows) {
 
   // Auto-fit columns to the content.
   resizeColumnsToFit_(sheet);
+}
+
+
+/**
+ * Creates a spreadsheet in a specific Drive folder with the given file name.
+ * This mirrors the doc helper above so the outputs stay organized consistently.
+ */
+function createSpreadsheetInFolder_(fileName, driveFolderId) {
+  const folder = DriveApp.getFolderById(driveFolderId);
+
+  const spreadsheet = SpreadsheetApp.create(fileName);
+  const file = DriveApp.getFileById(spreadsheet.getId());
+  file.moveTo(folder); // puts the file in that folder
+
+  return spreadsheet;
+}
+
+
+/**
+ * Resizes all populated columns in a sheet so content is easier to read.
+ */
+function resizeColumnsToFit_(sheet) {
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn > 0) {
+    sheet.autoResizeColumns(1, lastColumn);
+  }
 }

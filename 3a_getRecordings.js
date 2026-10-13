@@ -22,7 +22,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
   const meetings = fetchHistoricalMeetings_(accessToken, dateFrom, dateTo);
 
   const filteredMeetings = meetings.filter(function (meeting) {
-    // guard against malformed records, which should theoretically be impossible, but just in case
+    // guard against malformed records
     if (!meeting || !meeting.meeting_id) return false;
 
     // optional check/filter for meeting ID
@@ -52,7 +52,6 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
     const datetime = convertISOTimeZone_(startTime);
 
     const meetingUuid = meeting.meeting_uuid;
-    // extra guard
     if (!meetingUuid) {
       console.warn("Skipping meeting with missing UUID: " + meeting.meeting_id);
       return;
@@ -60,10 +59,31 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
 
     const meetingUuidEncoded = prepareUuid_(meetingUuid);
 
-    // GET /meetings/{meetingId}/recordings
-    const recordingsUrl = `https://api.zoom.us/v2/meetings/${meetingUuidEncoded}/recordings`;
+    // try to extract a zoom meeting auto generated summary first (so that if a zoom summary does exist, then we generate it ASAP, and a later check will detect it when deciding whether to manually generate one, signaling that we don't need manually generate one)
     const summaryUrl = `https://api.zoom.us/v2/meetings/${meetingUuidEncoded}/meeting_summary`;
+    const rawSummaryData = httpGetData_(summaryUrl, accessToken, datetime);
 
+    // check code from httpGetData_(): 200 means it exists, so grab summary from zoom
+    if (rawSummaryData.code === 200) {
+      const fileName = datetime + " [Summary]";
+      const altFileName = datetime + " [Manual Summary]";
+
+      // Skip if a file with this name already exists in the folder
+      if (existingFilenames.has(fileName) || existingFilenames.has(altFileName)) {
+        console.log("File already imported: " + fileName + " or [Manual Summary]");
+      }
+      else {
+        const summaryData = JSON.parse(rawSummaryData.data);
+        const summaryText = summaryData.summary_content || "";
+        console.log("Downloading/Importing: " + fileName);
+        createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, summaryText);
+        existingFilenames.add(fileName);
+      }
+    }
+
+    // GET /meetings/{meetingId}/recordings
+    // try to extract a zoom meeting's transcript + chat
+    const recordingsUrl = `https://api.zoom.us/v2/meetings/${meetingUuidEncoded}/recordings`;
     const rawRecordingsData = httpGetData_(recordingsUrl, accessToken, datetime);
 
     // check code from httpGetData_
@@ -74,25 +94,6 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
       (recordingsData.recording_files || []).forEach(function (file) {
         processRecordingFile_(file, accessToken, datetime, existingFilenames);
       });
-    }
-
-    const rawSummaryData = httpGetData_(summaryUrl, accessToken, datetime);
-
-    // check code from httpGetData_
-    if (rawSummaryData.code === 200) {
-      const fileName = datetime + " [Summary]";
-
-      // Skip if a file with this name already exists in the folder
-      if (existingFilenames.has(fileName)) {
-        console.log("File already imported: " + fileName);
-      }
-      else {
-        const summaryData = JSON.parse(rawSummaryData.data);
-        const summaryText = summaryData.summary_content || "";
-        console.log("Downloading/Importing: " + fileName);
-        createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, summaryText);
-        existingFilenames.add(fileName);
-      }
     }
 
   });
@@ -112,11 +113,14 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
   if (file.file_type === "TRANSCRIPT") {
     const fileName = datetime + " [Transcript]";
     const fileNameExists = existingFilenames.has(fileName);
+    const summaryFileName = datetime + " [Summary]";
+    const altSummaryFileName = datetime + " [Manual Summary]";
+    const summaryFileExists = existingFilenames.has(summaryFileName) || existingFilenames.has(altSummaryFileName);
     const sheetName = datetime + " [Key Topics]";
     const sheetNameExists = existingFilenames.has(sheetName);
 
-    // both file and sheet exist, exit this subfunction and move onto the next file
-    if (fileNameExists && sheetNameExists) {
+    // main file, summary file, and sheet already exists: exit this subfunction and move onto the next file
+    if (fileNameExists && summaryFileExists && sheetNameExists) {
       return;
     }
 
@@ -127,7 +131,7 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
     // just removes the excessive number of extra newlines in the transcript
     transcript = transcript.replace(/\n/g, '');
 
-    // Skip if a file with this name already exists in the folder
+    // create a transcript doc if it doesn't already exist
     if (fileNameExists) {
       console.log("File already imported: " + fileName);
     }
@@ -135,6 +139,16 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
       console.log("Downloading/Importing: " + fileName);
       createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, transcript);
       existingFilenames.add(fileName);
+    }
+
+    // create a summary doc if it doesn't already exist
+    if (summaryFileExists) {
+      console.log("File already imported/generated: " + summaryFileName + " of [Manual Summary]");
+    }
+    else {
+      console.log("Generating: " + altSummaryFileName);
+      createSummaryDoc(DRIVE_FOLDER_ID, altSummaryFileName, transcript);
+      existingFilenames.add(altSummaryFileName);
     }
 
     // create key topics sheet from transcript if it doesn't already exist
@@ -322,20 +336,4 @@ function httpGetData_(url, accessToken, id = "") {
   }
 
   return { code: code, data: data };
-}
-
-
-/**
- * creates a google doc with a specific name, specific content, and in a specific drive folder
- */
-function createGoogleDocInFolder_(driveFolderId, docName, docContent) {
-  const folder = DriveApp.getFolderById(driveFolderId);
-
-  const doc = DocumentApp.create(docName);
-  doc.getBody().setText(docContent);
-
-  const file = DriveApp.getFileById(doc.getId());
-  file.moveTo(folder); // puts the file in that folder
-
-  return doc.getId();
 }
