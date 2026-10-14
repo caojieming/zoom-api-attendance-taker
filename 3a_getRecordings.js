@@ -76,7 +76,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
         const summaryData = JSON.parse(rawSummaryData.data);
         const summaryText = summaryData.summary_content || "";
         console.log("Downloading/Importing: " + fileName);
-        createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, summaryText);
+        createDocInFolder_(DRIVE_FOLDER_ID, fileName, summaryText);
         existingFilenames.add(fileName);
       }
     }
@@ -137,13 +137,13 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
     }
     else {
       console.log("Downloading/Importing: " + fileName);
-      createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, transcript);
+      createDocInFolder_(DRIVE_FOLDER_ID, fileName, transcript);
       existingFilenames.add(fileName);
     }
 
     // create a summary doc if it doesn't already exist
     if (summaryFileExists) {
-      console.log("File already imported/generated: " + summaryFileName + " of [Manual Summary]");
+      console.log("File already imported/generated: " + summaryFileName + " or [Manual Summary]");
     }
     else {
       console.log("Generating: " + altSummaryFileName);
@@ -182,7 +182,7 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
     }
     else {
       console.log("Downloading/Importing: " + fileName);
-      createGoogleDocInFolder_(DRIVE_FOLDER_ID, fileName, chatLog);
+      createDocInFolder_(DRIVE_FOLDER_ID, fileName, chatLog);
       existingFilenames.add(fileName);
     }
 
@@ -293,8 +293,8 @@ function fetchHistoricalMeetings_(accessToken, inFrom, inTo) {
  * Returns a Set of all file names already in the target folder.
  * also recursively traverses all subfolders for file names
  */
-function getExistingFilenameSet_(folderId) {
-  const folder = DriveApp.getFolderById(folderId);
+function getExistingFilenameSet_(driveFolderId) {
+  const folder = DriveApp.getFolderById(driveFolderId);
   const names = new Set();
 
   function walkFolder(currentFolder) {

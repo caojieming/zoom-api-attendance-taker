@@ -24,7 +24,7 @@ function buildChatterLinkedInSheet() {
   }
 
   // Create the new output spreadsheet in DRIVE_FOLDER_ID.
-  const outputSpreadsheet = createSpreadsheetInFolder_(outputName, DRIVE_FOLDER_ID);
+  const outputSpreadsheet = createSpreadsheetInFolder_(DRIVE_FOLDER_ID, outputName);
 
   // Use the first sheet in the newly created spreadsheet as the output sheet.
   const outputSheet = outputSpreadsheet.getSheets()[0];

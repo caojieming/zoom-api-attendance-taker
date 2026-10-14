@@ -4,14 +4,14 @@
 function createKeyTopicsSheet(driveFolderId, fileName, transcript) {
   // Prompt tells the model exactly what JSON shape to return and how to behave.
   const prompt = `
-You are analyzing a transcript and extracting its key topics.
+You are an expert thematic analyst specializing in transcription synthesis and key topic extraction.
 
 Return ONLY valid JSON in this exact shape:
 {
   "topics": [
     {
       "key_topic": "short concise topic name",
-      "summary": "1-2 sentence summary",
+      "summary": "1-2 sentence objective, factual summary",
       "significance": 1-5,
       "confidence": 1-5
     }
@@ -19,14 +19,14 @@ Return ONLY valid JSON in this exact shape:
 }
 
 Rules:
-- Keep topics concise and distinct.
-- Merge duplicates and near-duplicates.
-- Prioritize importance and recurrence.
-- Prefer the most central themes, not minor details.
+- Keep topics concise, distinct, and mutually exclusive.
+- Merge duplicates and near-duplicates into a single representative topic.
+- Determine significance (1-5) based on the duration of the discussion, the frequency of mention, and the topic's impact on the conversation's overall objective.
+- Prioritize central themes over minor details or tangential remarks.
 - Output between 5 and 20 topics unless the transcript clearly supports fewer or more.
-- significance: 1 = minor, 5 = highly central.
-- confidence: 1 = low confidence, 5 = very confident.
-- No markdown, no code fences, no extra text.
+- confidence (1-5) reflects your certainty that the topic was a primary focus of the speakers.
+- Ensure all strings are properly escaped for JSON compliance to avoid syntax errors.
+- No markdown, no code fences, no preamble, and no extra text.
 
 Transcript:
 ${transcript}
@@ -56,41 +56,44 @@ ${transcript}
 function createSummaryDoc(driveFolderId, fileName, transcript) {
   // Prompt tells the model to generate a Zoom-style meeting summary in a clean doc-friendly format.
   const prompt = `
-You are analyzing a meeting transcript and generating a Zoom-style meeting summary.
+You are an expert Executive Assistant specializing in corporate governance and project management.
 
-Write the summary in a professional, concise format with these sections, in this exact order:
+Task:
+Generate a concise, accurate, and highly scanable summary of the meeting transcript provided below.
 
-Meeting Summary
-Key Points
-Decisions
-Action Items
+Instructions:
+- Use only information explicitly supported by the transcript; do not invent details or assume outcomes.
+- Filter out all conversational filler, social pleasantries, and technical interruptions to focus on high-value information.
+- Distinguish clearly between a proposal/suggestion and a final, confirmed decision.
+- Attribute key points, decisions, and action items to the specific speaker(s) involved.
+- Use professional, objective language and avoid adjectives that imply emotion unless the emotional tone of the meeting is a critical data point.
+- Use bolding for names, deadlines, and key deliverables to improve scanability.
+- If a specific detail (like a due date) is missing, write "Not specified."
 
-Rules:
-- Use plain text only.
-- Keep it concise but useful.
-- Mirror the style of a typical Zoom meeting summary: brief overview first, then bullet-style highlights.
-- "Meeting Summary" should be a short paragraph of 2-4 sentences.
-- "Key Points" should be 3-8 bullets covering the main discussion themes.
-- "Decisions" should be 0-5 bullets describing explicit decisions made.
-- "Action Items" should be 0-10 bullets describing follow-up tasks, ideally with owner and due date if mentioned.
-- If a section has nothing relevant, write "None".
-- Do not add markdown code fences.
-- Do not add extra commentary outside these sections.
+Output format:
 
-Use this exact output format:
+Title: [Meeting title if known, otherwise just use "Meeting Summary"]
 
-Meeting Summary
-<paragraph>
+Summary:
+[2-5 sentence high-level overview of the meeting's purpose and primary outcome]
 
-Key Points
-- <bullet>
-- <bullet>
+Key Discussion Points:
+- [Point 1] ([Speaker Name])
+- [Point 2] ([Speaker Name])
+- [Point 3] ([Speaker Name])
 
-Decisions
-- <bullet>
+Decisions Made:
+- [Decision 1] - Confirmed by [Name/Group]
+- [Decision 2] - Confirmed by [Name/Group]
 
-Action Items
-- <bullet>
+Action Items:
+- [Task] | Owner: **[Name]** | Due: **[Date/Not specified]**
+
+Open Questions / Risks:
+- [Question or risk item] | Raised by: [Name]
+
+Notes:
+- [Optional extra important details or context]
 
 Transcript:
 ${transcript}
@@ -181,7 +184,7 @@ function createExtractionSheet_({
   countKey
 }) {
   // Create the spreadsheet and use its first sheet as the output destination.
-  const spreadsheet = createSpreadsheetInFolder_(fileName, driveFolderId);
+  const spreadsheet = createSpreadsheetInFolder_(driveFolderId, fileName);
   const sheet = spreadsheet.getSheets()[0];
 
   // Send the prompt to Gemini and parse the JSON response.
@@ -214,7 +217,7 @@ function createTextDocFromPrompt_({ driveFolderId, fileName, prompt }) {
   const text = callGeminiText_(prompt);
 
   // Create the Google Doc in the target folder with the generated content.
-  const docId = createGoogleDocInFolder_(driveFolderId, fileName, text);
+  const docId = createDocInFolder_(driveFolderId, fileName, text);
 
   // Return useful metadata about the generated document.
   return {
@@ -422,21 +425,6 @@ function writeTableToSheet_(sheet, headers, rows) {
 
   // Auto-fit columns to the content.
   resizeColumnsToFit_(sheet);
-}
-
-
-/**
- * Creates a spreadsheet in a specific Drive folder with the given file name.
- * This mirrors the doc helper above so the outputs stay organized consistently.
- */
-function createSpreadsheetInFolder_(fileName, driveFolderId) {
-  const folder = DriveApp.getFolderById(driveFolderId);
-
-  const spreadsheet = SpreadsheetApp.create(fileName);
-  const file = DriveApp.getFileById(spreadsheet.getId());
-  file.moveTo(folder); // puts the file in that folder
-
-  return spreadsheet;
 }
 
 

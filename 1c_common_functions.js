@@ -242,22 +242,24 @@ function goToSheet_(sheetName) {
 
 
 /**
- * Creates a new spreadsheet and moves it into the specified Drive folder.
- * @param {string} sheetName
- * @param {string} folderId
+ * Creates a new spreadsheet and moves it into a specified Drive folder.
+ * @param {string} driveFolderId
+ * @param {string} fileName
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet}
  */
-function createSpreadsheetInFolder_(sheetName, folderId) {
-  if (!sheetName || !folderId) {
-    throw new Error('Missing sheetName or folderId.');
+function createSpreadsheetInFolder_(driveFolderId, fileName) {
+  // Make sure both required values are provided before doing any Drive work.
+  if (!driveFolderId || !fileName) {
+    throw new Error('Missing driveFolderId or fileName.');
   }
 
-  const ss = SpreadsheetApp.create(sheetName);
+  // Create the spreadsheet.
+  const ss = SpreadsheetApp.create(fileName);
   const file = DriveApp.getFileById(ss.getId());
-  const folder = DriveApp.getFolderById(folderId);
 
-  folder.addFile(file);
-  DriveApp.getRootFolder().removeFile(file);
+  // Move the spreadsheet file into the destination folder.
+  const folder = DriveApp.getFolderById(driveFolderId);
+  file.moveTo(folder);
 
   return ss;
 }
@@ -266,7 +268,7 @@ function createSpreadsheetInFolder_(sheetName, folderId) {
 /**
  * creates a google doc with a specific name, specific content, and in a specific drive folder
  */
-function createGoogleDocInFolder_(driveFolderId, docName, docContent) {
+function createDocInFolder_(driveFolderId, docName, docContent) {
   const folder = DriveApp.getFolderById(driveFolderId);
 
   const doc = DocumentApp.create(docName);
