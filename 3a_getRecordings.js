@@ -1,11 +1,13 @@
 // can't get more than 1 month worth of records at a time, need to call multiple times
 function getRecordingsHalfYear() {
-  getRecordings(ONE_MONTH_AGO, NOW);
-  getRecordings(TWO_MONTHS_AGO, ONE_MONTH_AGO);
-  getRecordings(THREE_MONTHS_AGO, TWO_MONTHS_AGO);
-  getRecordings(FOUR_MONTHS_AGO, THREE_MONTHS_AGO);
-  getRecordings(FIVE_MONTHS_AGO, FOUR_MONTHS_AGO);
-  getRecordings(SIX_MONTHS_AGO, FIVE_MONTHS_AGO);
+  [
+    [ONE_MONTH_AGO, NOW],
+    [TWO_MONTHS_AGO, ONE_MONTH_AGO],
+    [THREE_MONTHS_AGO, TWO_MONTHS_AGO],
+    [FOUR_MONTHS_AGO, THREE_MONTHS_AGO],
+    [FIVE_MONTHS_AGO, FOUR_MONTHS_AGO],
+    [SIX_MONTHS_AGO, FIVE_MONTHS_AGO],
+  ].forEach(([from, to]) => getRecordings(from, to));
 }
 
 
@@ -46,7 +48,7 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
     return true;
   });
 
-  // 2. Iterate through filtered list of meetings for recordings
+  // iterate through filtered list of meetings for recordings
   filteredMeetings.forEach(function (meeting) {
     const startTime = convertPlainToISO_(meeting.start_time) || "";
     const datetime = convertISOTimeZone_(startTime);
@@ -95,7 +97,6 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
         processRecordingFile_(file, accessToken, datetime, existingFilenames);
       });
     }
-
   });
 
   // moves all loose files into date folders
@@ -125,7 +126,11 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
     }
 
     const downloadUrl = file.download_url;
-    const rawTranscript = httpGetData_(downloadUrl, accessToken);
+    const rawTranscript = httpGetData_(downloadUrl, accessToken, datetime + " [Transcript]");
+    if (rawTranscript.code !== 200) {
+      return;
+    }
+
     let transcript = rawTranscript.data;
 
     // just removes the excessive number of extra newlines in the transcript
@@ -173,7 +178,11 @@ function processRecordingFile_(file, accessToken, datetime, existingFilenames) {
     }
 
     const downloadUrl = file.download_url;
-    const rawChatLog = httpGetData_(downloadUrl, accessToken);
+    const rawChatLog = httpGetData_(downloadUrl, accessToken, datetime + " [Chat Log]");
+    if (rawChatLog.code !== 200) {
+      return;
+    }
+
     const chatLog = rawChatLog.data;
 
     // Skip if a file with this name already exists in the folder
