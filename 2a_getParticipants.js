@@ -3,7 +3,7 @@
 // Delimiters that indicate a participant name contains extra text
 // (e.g. device names, locations, punctuation, etc.)
 // Everything from the delimiter onward is removed
-const PARTICIPANT_DELIMITERS = ["’s iPhone", "’s iPad", "iPhone", " SaaS ", " - ", " (", " | ", " SoCal", ", ", ": ", ];
+const PARTICIPANT_DELIMITERS = ["’s iPhone", "’s iPad", "iPhone", " SaaS ", "’s -", " - ", " (", " | ", " SoCal", ", ", ": "];
 
 // Minimum allowed length for a participant name after cleanup.
 const PARTICIPANT_MIN_NAME_LENGTH = 2;
@@ -13,12 +13,6 @@ const PARTICIPANT_BLACKLIST = ["calendly", "notetaker", "nоtеtаkеr", "read.a
 
 // If true, exact duplicate participant names are merged into one row.
 const MERGE_DUPES = true;
-
-// If true, similar names are merged using string similarity.
-const MERGE_SIMILAR = true;
-
-// Similarity threshold for merging near-duplicate names.
-const SIMILARITY_THRESHOLD_RATIO = 0.8;
 
 
 /**
@@ -253,7 +247,7 @@ function sanitizeParticipants_(participants, fullMembersList) {
       const listMember = fullMembersList[m];
       const similarityRatio = stringSimilarity_(curName, listMember.name);
       // name from full members list first, name from chat list second
-      const isSubsequence = isSubsequence_(listMember.name, curName);
+      const isSubsequence = isSubsequence_(listMember.name, curName) && curName >= PARTIAL_NAME_THRESHOLD;
 
       if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
         if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {

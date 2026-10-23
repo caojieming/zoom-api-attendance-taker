@@ -40,6 +40,14 @@ const PAGE_SIZE = 200;
 const ONLY_FOURTH_THURS = true;
 
 
+// If true, similar names are merged using string similarity.
+const MERGE_SIMILAR = true;
+// Similarity threshold for merging near-duplicate names.
+const SIMILARITY_THRESHOLD_RATIO = 0.8;
+// if merging similar is enabled, merge participants when one name is a subsequence of the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long
+const PARTIAL_NAME_THRESHOLD = 5;
+
+
 // gemini model to use when applicable
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 /**

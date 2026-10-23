@@ -1,7 +1,3 @@
-// if merging similar is enabled, merge participants when one name is a subsequence of the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long
-const PARTIAL_NAME_THRESHOLD = 5;
-
-
 /**
  * creates a new sheet that shows attendees ranked by attendance rate (# of meetings attended / total # of meetings traversed) + which meetings they attended
  */
