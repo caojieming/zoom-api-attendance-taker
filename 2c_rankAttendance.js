@@ -125,14 +125,14 @@ function rankAttendance() {
   ss.setActiveSheet(rankedSheet);
   ss.moveActiveSheet(2);
 
-  const header = ["name", "matched_name", "matched_chapter", "rate", ...dates];
+  const header = ["name", "matched_name", "matched_chapter", "attended", "rate", ...dates];
 
   const rows = participants.map(p => {
     const attended = p.attended || 0;
     const rate = totalNumMeetings ? (attended / totalNumMeetings) : 0;
     const rateStr = totalNumMeetings ? (rate * 100).toFixed(2) + "%" : "";
 
-    const row = [p.name, p.matched_name, p.matched_chapter, rateStr];
+    const row = [p.name, p.matched_name, p.matched_chapter, attended, rateStr];
     for (const dateLabel of dates) {
       const val = p.durationsByDate?.[dateLabel];
       row.push(val === undefined || val === null || val === "" ? "" : val);
