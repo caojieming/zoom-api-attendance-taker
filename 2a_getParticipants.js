@@ -247,7 +247,7 @@ function sanitizeParticipants_(participants, fullMembersList) {
       const listMember = fullMembersList[m];
       const similarityRatio = stringSimilarity_(curName, listMember.name);
       // name from full members list first, name from chat list second
-      const isSubsequence = isSubsequence_(listMember.name, curName) && curName >= PARTIAL_NAME_THRESHOLD;
+      const isSubsequence = isSubsequence_(listMember.name, curName) && curName.length >= PARTIAL_NAME_THRESHOLD;
 
       if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
         if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
@@ -281,17 +281,40 @@ function sanitizeParticipants_(participants, fullMembersList) {
     for (const past of sanitized) {
       // Merge exact duplicates.
       if (MERGE_DUPES && cur.name === past.name) {
-        past.leave_time = cur.leave_time;
+        past.leave_time = cur.leave_time > past.leave_time ? cur.leave_time : past.leave_time;
         past.duration += Number(cur.duration || 0);
         past.timesRejoined += 1;
         merged = true;
         break;
       }
 
-      // Merge near-duplicates using similarity score.
-      if (MERGE_SIMILAR && stringSimilarity_(cur.name, past.name) >= SIMILARITY_THRESHOLD_RATIO) {
-        past.name = cur.name;
-        past.leave_time = cur.leave_time;
+      // some prep work
+      const nameA = cur.name;
+      const nameB = past.name;
+      const shorter = nameA.length <= nameB.length ? nameA : nameB;
+      const longer = nameA.length > nameB.length ? nameA : nameB;
+      const personChosen = longer === nameA ? cur : past;
+
+      // merge entries that are subsequences
+      const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
+      if(isSubsequence) {
+        past.name = longer;
+        past.matched_name = personChosen.matched_name;
+        past.matched_chapter = personChosen.matched_chapter;
+        past.leave_time = cur.leave_time > past.leave_time ? cur.leave_time : past.leave_time;
+        past.duration += Number(cur.duration || 0);
+        past.timesRejoined += 1;
+        merged = true;
+        break;
+      }
+
+      // merge near-duplicates using similarity score
+      const stringsSimilar = stringSimilarity_(cur.name, past.name) >= SIMILARITY_THRESHOLD_RATIO;
+      if (MERGE_SIMILAR && stringsSimilar) {
+        past.name = longer;
+        past.matched_name = personChosen.matched_name;
+        past.matched_chapter = personChosen.matched_chapter;
+        past.leave_time = cur.leave_time > past.leave_time ? cur.leave_time : past.leave_time;
         past.duration += Number(cur.duration || 0);
         past.timesRejoined += 1;
         merged = true;
