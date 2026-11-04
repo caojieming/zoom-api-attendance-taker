@@ -174,19 +174,25 @@ function mergeSimilarParticipants_(participants) {
       for (let j = i + 1; j < participants.length; j++) {
         if (used[j]) continue;
 
-        const nameA = participants[baseIdx].name;
-        const nameB = participants[j].name;
+        // const nameA = participants[baseIdx].name;
+        // const nameB = participants[j].name;
 
-        const shorter = nameA.length <= nameB.length ? nameA : nameB;
-        const longer = nameA.length > nameB.length ? nameA : nameB;
+        // const shorter = nameA.length <= nameB.length ? nameA : nameB;
+        // const longer = nameA.length > nameB.length ? nameA : nameB;
 
-        // shorter name is a direct subsequence to the longer name
-        // subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
-        const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
+        // // shorter name is a direct subsequence to the longer name
+        // // subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
+        // const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
 
-        const isSimilar = stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
+        // const isSimilar = stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
 
-        if (isSubsequence || isSimilar) {
+        // if (isSubsequence || isSimilar) {
+        //   groupIdx.push(j);
+        //   used[j] = true;
+        // }
+
+        // simpler method to determine if similar: if their matched_names are the exact same (and matched_name is not blank)
+        if (participants[baseIdx].matched_name && participants[baseIdx].matched_name === participants[j].matched_name) {
           groupIdx.push(j);
           used[j] = true;
         }
