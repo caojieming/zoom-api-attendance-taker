@@ -174,28 +174,35 @@ function mergeSimilarParticipants_(participants) {
       for (let j = i + 1; j < participants.length; j++) {
         if (used[j]) continue;
 
-        // const nameA = participants[baseIdx].name;
-        // const nameB = participants[j].name;
-
-        // const shorter = nameA.length <= nameB.length ? nameA : nameB;
-        // const longer = nameA.length > nameB.length ? nameA : nameB;
-
-        // // shorter name is a direct subsequence to the longer name
-        // // subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
-        // const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
-
-        // const isSimilar = stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
-
-        // if (isSubsequence || isSimilar) {
-        //   groupIdx.push(j);
-        //   used[j] = true;
-        // }
-
-        // simpler method to determine if similar: if their matched_names are the exact same (and matched_name is not blank)
+        // simpler method to determine if similar: base matched_name is not blank and the other matched_name is the exact same
         if (participants[baseIdx].matched_name && participants[baseIdx].matched_name === participants[j].matched_name) {
           groupIdx.push(j);
           used[j] = true;
+          continue;
         }
+
+        // if matched_name isn't blank but also isn't a match, don't do anything
+
+        // if both matched_names are blank, merge if their names similar
+        if(!participants[baseIdx].matched_name && !participants[j].matched_name) {
+          const nameA = participants[baseIdx].name;
+          const nameB = participants[j].name;
+
+          const shorter = nameA.length <= nameB.length ? nameA : nameB;
+          const longer = nameA.length > nameB.length ? nameA : nameB;
+
+          // shorter name is a direct subsequence to the longer name
+          // subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
+          const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
+
+          const isSimilar = stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
+
+          if (isSubsequence || isSimilar) {
+            groupIdx.push(j);
+            used[j] = true;
+          }
+        }
+
       }
     }
 
