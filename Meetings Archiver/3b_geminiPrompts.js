@@ -244,7 +244,7 @@ function callGeminiJson_(prompt) {
     }
   };
 
-  const maxAttempts = 3;
+  const maxAttempts = 5;
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -260,19 +260,8 @@ function callGeminiJson_(prompt) {
       const body = response.getContentText();
 
       if (status < 200 || status >= 300) {
-        const errorText = (body || "").toLowerCase();
-
         // Retry only on transient capacity/traffic-style errors.
-        const isTransient =
-          status === 429 ||
-          status === 503 ||
-          errorText.includes("high traffic") ||
-          errorText.includes("overloaded") ||
-          errorText.includes("try again") ||
-          errorText.includes("resource exhausted") ||
-          errorText.includes("temporarily unavailable");
-
-        if (isTransient) {
+        if (isTransientError_(status, body)) {
           throw new Error(`Transient Gemini error (${status}): ${body}`);
         }
 
@@ -291,18 +280,13 @@ function callGeminiJson_(prompt) {
       lastError = err;
 
       const message = String(err && err.message ? err.message : err);
-      const isTransient =
-        message.includes("Transient Gemini error") ||
-        message.includes("fetch failed") ||
-        message.includes("timeout") ||
-        message.includes("temporarily unavailable") ||
-        message.includes("high traffic") ||
-        message.includes("overloaded") ||
-        message.includes("resource exhausted");
 
       // Retry only transient failures, and only if attempts remain.
-      if (isTransient && attempt < maxAttempts) {
-        Utilities.sleep(1000 * attempt); // 1s, then 2s backoff
+      if (isTransientError_(null, message)) {
+        console.warn(`Failed to access Gemini API due to high traffic. This was attempt ${attempt} out of ${maxAttempts}.${(attempt >= maxAttempts) ? "" : " Retrying."}`);
+        if(attempt < maxAttempts) {
+          Utilities.sleep(1000 * attempt); // 1s, then 2s, etc. backoff
+        }
         continue;
       }
 
@@ -312,6 +296,26 @@ function callGeminiJson_(prompt) {
   }
 
   throw new Error(`Gemini request failed after ${maxAttempts} attempts: ${lastError.message}`);
+}
+
+
+/**
+ * returns true if the passed in error info indicates a transient error (calling API during high traffic, trying again later will probably work)
+ */
+function isTransientError_(status, bodyOrMessage) {
+  const text = String(bodyOrMessage || "").toLowerCase();
+  return (
+    status === 429 ||
+    status === 503 ||
+    text.includes("high demand") ||
+    text.includes("high traffic") ||
+    text.includes("overloaded") ||
+    text.includes("try again") ||
+    text.includes("resource exhausted") ||
+    text.includes("temporarily unavailable") ||
+    text.includes("fetch failed") ||
+    text.includes("timeout")
+  );
 }
 
 

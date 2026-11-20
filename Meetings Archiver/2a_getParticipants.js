@@ -208,6 +208,9 @@ function filterMeeting_(meeting) {
   // Optional filter: only include meetings held on the fourth Thursday.
   if (ONLY_FOURTH_THURS && !isFourthThursday_(meeting.start_time || "")) return false;
 
+  // Optional filter: only include meetings held on the third Thursday.
+  if (ONLY_THIRD_THURS && !isThirdThursday_(meeting.start_time || "")) return false;
+
   return true;
 }
 

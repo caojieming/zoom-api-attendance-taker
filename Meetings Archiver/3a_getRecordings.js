@@ -39,11 +39,13 @@ function getRecordings(dateFrom = FROM, dateTo = TO) {
       return false;
     }
 
-    // optional check/filter if only looking for meetings on the fourth thursday of the month
     const startTime = meeting.start_time || "";
-    if (ONLY_FOURTH_THURS && !isFourthThursday_(startTime)) {
-      return false;
-    }
+
+    // optional check/filter if only looking for meetings on the fourth thursday of the month
+    if (ONLY_FOURTH_THURS && !isFourthThursday_(startTime)) return false;
+
+    // optional check/filter if only looking for meetings on the third thursday of the month
+    if (ONLY_THIRD_THURS && !isThirdThursday_(startTime)) return false;
 
     return true;
   });

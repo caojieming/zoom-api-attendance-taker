@@ -68,6 +68,23 @@ function isFourthThursday_(isoDate) {
 
 
 /**
+ * Returns true if the given date falls on the third Thursday of its month.
+ * @param {string|Date} isoDate
+ * @returns {boolean}
+ */
+function isThirdThursday_(isoDate) {
+  const date = new Date(isoDate);
+  if (isNaN(date.getTime())) return false;
+
+  // Thursday = 4 in JavaScript's getDay()
+  if (date.getDay() !== 4) return false;
+
+  const dayOfMonth = date.getDate();
+  return dayOfMonth >= 15 && dayOfMonth <= 21;
+}
+
+
+/**
  * Pads a number to 2 digits.
  * @param {number} value
  * @returns {string}

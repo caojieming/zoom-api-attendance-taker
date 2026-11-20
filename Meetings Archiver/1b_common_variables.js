@@ -37,7 +37,9 @@ const PAGE_SIZE = 200;
 
 
 // toggle to include only meetings that occurr on 4th thursdays of the month
-const ONLY_FOURTH_THURS = true;
+const ONLY_FOURTH_THURS = false;
+// toggle to include only meetings that occurr on 3rd thursdays of the month
+const ONLY_THIRD_THURS = true;
 
 
 // If true, similar names are merged using string similarity.
@@ -68,4 +70,3 @@ const MEMBERS_SPREADSHEET_SHEETNAME = "Full Member List";
 
 // How far back to look into generated record history for multiple functions (attendance ranker, generate chatter list)
 const MONTHS_BACK = 6;
-
