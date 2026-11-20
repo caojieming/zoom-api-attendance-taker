@@ -3,7 +3,7 @@
 // Delimiters that indicate a participant name contains extra text
 // (e.g. device names, locations, punctuation, etc.)
 // Everything from the delimiter onward is removed
-const PARTICIPANT_DELIMITERS = ["’s iPhone", "’s iPad", "iPhone", " SaaS ", "’s -", " - ", " (", " | ", " SoCal", ", ", ": "];
+const PARTICIPANT_DELIMITERS = ["’s iPhone", "’s iPad", "iPhone", " SaaS ", "’s -", " - ", " (", " | ", " SoCal", ", ", ": ", " NY Metro"];
 
 // Minimum allowed length for a participant name after cleanup.
 const PARTICIPANT_MIN_NAME_LENGTH = 2;
