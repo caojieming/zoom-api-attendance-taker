@@ -5,6 +5,8 @@
  * If a sheet with the same name already exists, it is deleted and recreated.
  * The recreated sheet is inserted at the same tab position as the old one.
  *
+ * If columnNames is null, all columns are copied.
+ *
  * @param {string[]} columnNames - List of header names to copy.
  * @param {string} sourceSpreadsheetId - ID of the input Google Spreadsheet.
  * @param {string} sourceSheetName - Sheet name in the source spreadsheet.
@@ -28,18 +30,26 @@ function copyColumnsFromSpreadsheet(columnNames, sourceSpreadsheetId, sourceShee
   // The first row is assumed to be the header row.
   const headers = data[0];
 
-  // Put requested column names into a Set for fast lookup.
-  const wanted = new Set(columnNames);
-
   // Store the column indexes we want to keep.
   const matchedIndexes = [];
 
-  // Walk through the headers and remember which columns match.
-  headers.forEach((header, i) => {
-    if (wanted.has(String(header))) {
+  // If no column names were provided, copy every column.
+  if (columnNames === null) {
+    for (let i = 0; i < headers.length; i++) {
       matchedIndexes.push(i);
     }
-  });
+  }
+  else {
+    // Put requested column names into a Set for fast lookup.
+    const wanted = new Set(columnNames);
+
+    // Walk through the headers and remember which columns match.
+    headers.forEach((header, i) => {
+      if (wanted.has(String(header))) {
+        matchedIndexes.push(i);
+      }
+    });
+  }
 
   // Stop if none of the requested columns were found.
   if (matchedIndexes.length === 0) {
@@ -74,7 +84,7 @@ function copyColumnsFromSpreadsheet(columnNames, sourceSpreadsheetId, sourceShee
     .getRange(1, 1, output.length, output[0].length)
     .setValues(output);
 
-
+    
   // Freeze the header row.
   newSheet.setFrozenRows(1);
 
