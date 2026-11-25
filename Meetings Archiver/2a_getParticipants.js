@@ -3,13 +3,13 @@
 // Delimiters that indicate a participant name contains extra text
 // (e.g. device names, locations, punctuation, etc.)
 // Everything from the delimiter onward is removed
-const PARTICIPANT_DELIMITERS = ["’s iPhone", "’s iPad", "iPhone", " SaaS ", "’s -", " - ", " (", " | ", " SoCal", ", ", ": ", " NY Metro"];
+const PARTICIPANT_DELIMITERS = ["’s iPhone", "’s iPad", "iPhone", " SaaS ", "’s -", " - ", " (", " | ", " SoCal", ", ", ": ", " NY Metro", " NYC Chapter"];
 
 // Minimum allowed length for a participant name after cleanup.
 const PARTICIPANT_MIN_NAME_LENGTH = 2;
 
 // Names containing any of these substrings are excluded entirely.
-const PARTICIPANT_BLACKLIST = ["calendly", "notetaker", "nоtеtаkеr", "read.ai"];
+const PARTICIPANT_BLACKLIST = ["calendly", "notetaker", "nоtеtаkеr", "read.ai", "'s Assistant"];
 
 // If true, exact duplicate participant names are merged into one row.
 const MERGE_DUPES = true;
@@ -248,9 +248,15 @@ function sanitizeParticipants_(participants, fullMembersList) {
     let bestMatch = null;
     for (let m = 0; m < fullMembersList.length; m++) {
       const listMember = fullMembersList[m];
+
       const similarityRatio = stringSimilarity_(curName, listMember.name);
-      // name from full members list first, name from chat list second
-      const isSubsequence = isSubsequence_(listMember.name, curName) && curName.length >= PARTIAL_NAME_THRESHOLD;
+
+      // subsequence checking
+      const nameA = curName;
+      const nameB = listMember.name;
+      const shorter = nameA.length <= nameB.length ? nameA : nameB;
+      const longer = nameA.length > nameB.length ? nameA : nameB;
+      const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
 
       if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
         if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
