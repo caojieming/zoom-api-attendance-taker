@@ -66,5 +66,5 @@ function compareFullToEmail() {
 
 
 function compareAttendanceToEmail() {
-  mergeTwoSheets("Attendance Ranker", "Email List", "Email Primary", "email", "Compare Full to Email");
+  mergeTwoSheets("Ranked Attendance", "Email List", "matched_name", "name", "Compare Attendance to Email");
 }

@@ -10,3 +10,20 @@ function resizeColumnsToFit_(sheet) {
     sheet.autoResizeColumns(1, numColumns);
   }
 }
+
+
+/**
+ * return true if partString is a subsequence of mainString
+ * subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
+ */
+function isSubsequence_(mainString, partString) {
+  mainString = mainString.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  partString = partString.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  let i = 0, j = 0;
+  while (i < mainString.length && j < partString.length) {
+    if (mainString[i] === partString[j]) j++;
+    i++;
+  }
+  // If j reaches end of partString, that means all characters of partString were found in mainString
+  return j === partString.length;
+}

@@ -6,6 +6,10 @@
  * - Preserves all original columns from both sheets
  * - Includes unmatched rows from both sheets
  *
+ * Matching/join on rule:
+ * - exact same value, OR
+ * - either join value is a subsequence of the other
+ *
  * @param {string} sheetName1 First sheet/tab name
  * @param {string} sheetName2 Second sheet/tab name
  * @param {string} joinColumn1 Header name to join on in first sheet
@@ -37,22 +41,44 @@ function mergeTwoSheets(sheetName1, sheetName2, joinColumn1, joinColumn2, output
   if (joinIndex1 === -1) throw new Error(`Join column "${joinColumn1}" not found in "${sheetName1}".`);
   if (joinIndex2 === -1) throw new Error(`Join column "${joinColumn2}" not found in "${sheetName2}".`);
 
-  // Normalize join values for case-insensitive matching
-  const normalize = (value) => String(value === null || value === undefined ? "" : value).trim().toLowerCase();
+  // Normalize join values for exact case-insensitive matching.
+  // Empty/null values are treated as non-matches.
+  const normalize = (value) => {
+    if (value === null || value === undefined) return "";
+    return String(value).trim().toLowerCase();
+  };
 
-  // Build lookup map for sheet2
-  const map2 = new Map();
-  for (let r = 1; r < data2.length; r++) {
-    const row2 = data2[r].slice(0, headers2.length);
+  // Safeguard for empty values:
+  // If either compared value is empty, skip it.
+  const hasValue = (value) => normalize(value) !== "";
+
+  // Exact match if values are the same, or fuzzy match if either value is a subsequence of the other.
+  const isJoinMatch_ = (value1, value2) => {
+    if (!hasValue(value1) || !hasValue(value2)) return false;
+
+    const v1 = normalize(value1);
+    const v2 = normalize(value2);
+
+    if (v1 === v2) return true;
+
+    // Use the given subsequence helper in both directions.
+    return isSubsequence_(v1, v2) || isSubsequence_(v2, v1);
+  };
+
+  // Build an exact-match index for sheet2 so we can avoid expensive pairwise checks when possible.
+  // Map key: normalized join value
+  // Map value: array of row indexes in sheet2 with that exact key
+  const exactMap2 = new Map();
+  const usedSheet2Rows = new Set();
+
+  for (let r2 = 1; r2 < data2.length; r2++) {
+    const row2 = data2[r2].slice(0, headers2.length);
     const key = normalize(row2[joinIndex2]);
-    if (!key) continue;
+    if (!key) continue; // skip empty join values
 
-    if (!map2.has(key)) map2.set(key, []);
-    map2.get(key).push(row2);
+    if (!exactMap2.has(key)) exactMap2.set(key, []);
+    exactMap2.get(key).push({ rowIndex: r2, row: row2 });
   }
-
-  // Track which sheet2 rows were matched so we can output unmatched ones later
-  const matchedSheet2Keys = new Set();
 
   // Output headers: keep all columns from both sheets, including both join columns
   const outputHeaders = [
@@ -62,23 +88,60 @@ function mergeTwoSheets(sheetName1, sheetName2, joinColumn1, joinColumn2, output
 
   const outputRows = [outputHeaders];
 
-  // Full outer join: process all rows from sheet1 first
+  // Helper to emit a merged row.
+  const pushMergedRow = (row1, row2) => {
+    outputRows.push([
+      ...padRow_(row1, headers1.length),
+      ...padRow_(row2, headers2.length)
+    ]);
+  };
+
+  // Full outer join: process all rows from sheet1 first.
   for (let r1 = 1; r1 < data1.length; r1++) {
     const row1 = data1[r1].slice(0, headers1.length);
-    const key = normalize(row1[joinIndex1]);
-    const matches = map2.get(key);
+    const value1 = row1[joinIndex1];
 
-    if (matches && matches.length) {
-      matches.forEach(row2 => {
-        matchedSheet2Keys.add(key);
-        const fullRow = [
-          ...padRow_(row1, headers1.length),
-          ...padRow_(row2, headers2.length)
-        ];
-        outputRows.push(fullRow);
-      });
+    // Skip empty join values early; they cannot match.
+    if (!hasValue(value1)) {
+      outputRows.push([
+        ...padRow_(row1, headers1.length),
+        ...Array(headers2.length).fill("")
+      ]);
+      continue;
     }
-    else {
+
+    const key1 = normalize(value1);
+    const exactMatches = exactMap2.get(key1) || [];
+
+    let matched = false;
+
+    // 1) Fast path: exact matches first
+    if (exactMatches.length) {
+      exactMatches.forEach(match => {
+        usedSheet2Rows.add(match.rowIndex);
+        matched = true;
+        pushMergedRow(row1, match.row);
+      });
+      continue;
+    }
+
+    // 2) Slow path: only subsequence checks against unmatched sheet2 rows
+    for (let r2 = 1; r2 < data2.length; r2++) {
+      if (usedSheet2Rows.has(r2)) continue;
+
+      const row2 = data2[r2].slice(0, headers2.length);
+      const value2 = row2[joinIndex2];
+
+      if (!hasValue(value2)) continue; // skip empty join values
+
+      if (isJoinMatch_(value1, value2)) {
+        usedSheet2Rows.add(r2);
+        matched = true;
+        pushMergedRow(row1, row2);
+      }
+    }
+
+    if (!matched) {
       // No match in sheet2: keep row1 and blank out sheet2 columns
       outputRows.push([
         ...padRow_(row1, headers1.length),
@@ -89,33 +152,33 @@ function mergeTwoSheets(sheetName1, sheetName2, joinColumn1, joinColumn2, output
 
   // Add unmatched rows from sheet2
   for (let r2 = 1; r2 < data2.length; r2++) {
-    const row2 = data2[r2].slice(0, headers2.length);
-    const key = normalize(row2[joinIndex2]);
+    if (usedSheet2Rows.has(r2)) continue;
 
-    // If key is empty or never matched, include it
-    // If there are duplicate keys in sheet2 and some matched, this still outputs only the unmatched keys
-    if (!key || !Array.from(matchedSheet2Keys).includes(key)) {
-      const row1Blank = Array(headers1.length).fill("");
-      outputRows.push([
-        ...row1Blank,
-        ...padRow_(row2, headers2.length)
-      ]);
-    }
+    const row2 = data2[r2].slice(0, headers2.length);
+    const value2 = row2[joinIndex2];
+
+    // Skip empty join values only for matching logic; still include them as unmatched rows.
+    const row1Blank = Array(headers1.length).fill("");
+    outputRows.push([
+      ...row1Blank,
+      ...padRow_(row2, headers2.length)
+    ]);
   }
 
   // Create or clear output sheet
   let outSheet = ss.getSheetByName(outputSheetName);
   if (!outSheet) {
     outSheet = ss.insertSheet(outputSheetName);
-  }
-  else {
+  } else {
     outSheet.clearContents();
+    outSheet.clearFormats();
+    const existingFilter = outSheet.getFilter();
+    if (existingFilter) existingFilter.remove();
   }
 
   // Write result
   outSheet.getRange(1, 1, outputRows.length, outputRows[0].length).setValues(outputRows);
   outSheet.autoResizeColumns(1, outputRows[0].length);
-
 
   // Freeze the header row.
   outSheet.setFrozenRows(1);
@@ -130,8 +193,6 @@ function mergeTwoSheets(sheetName1, sheetName2, joinColumn1, joinColumn2, output
   });
 
   // (re)Add a filter over the copied data range.
-  const filter = outSheet.getFilter();
-  if (filter) filter.remove();
   outSheet.getRange(1, 1, outputRows.length, outputRows[0].length).createFilter();
 }
 
