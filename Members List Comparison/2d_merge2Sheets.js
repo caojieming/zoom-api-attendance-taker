@@ -48,9 +48,12 @@ function mergeTwoSheets(sheetName1, sheetName2, joinColumn1, joinColumn2, output
     return String(value).trim().toLowerCase();
   };
 
-  // Safeguard for empty values:
-  // If either compared value is empty, skip it.
-  const hasValue = (value) => normalize(value) !== "";
+  // Safeguard for empty / placeholder values:
+  // If either compared value is empty, null, or a placeholder like N/A, skip it.
+  const hasValue = (value) => {
+    const v = normalize(value);
+    return v !== "" && v !== "n/a" && v !== "n/a?" && v !== "na" && v !== "none" && v !== "null";
+  };
 
   // Exact match if values are the same, or fuzzy match if either value is a subsequence of the other.
   const isJoinMatch_ = (value1, value2) => {
