@@ -252,11 +252,7 @@ function sanitizeParticipants_(participants, fullMembersList) {
       const similarityRatio = stringSimilarity_(curName, listMember.name);
 
       // subsequence checking
-      const nameA = curName;
-      const nameB = listMember.name;
-      const shorter = nameA.length <= nameB.length ? nameA : nameB;
-      const longer = nameA.length > nameB.length ? nameA : nameB;
-      const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
+      const isSubsequence = isSubsequence_(curName, listMember.name) || isSubsequence_(listMember.name, curName);
 
       if (similarityRatio >= SIMILARITY_THRESHOLD_RATIO || isSubsequence) {
         if (!bestMatch || similarityRatio > bestMatch.similarity_ratio) {
@@ -297,15 +293,8 @@ function sanitizeParticipants_(participants, fullMembersList) {
         break;
       }
 
-      // some prep work
-      const nameA = cur.name;
-      const nameB = past.name;
-      const shorter = nameA.length <= nameB.length ? nameA : nameB;
-      const longer = nameA.length > nameB.length ? nameA : nameB;
-      const personChosen = longer === nameA ? cur : past;
-
       // merge entries that are subsequences
-      const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
+      const isSubsequence = isSubsequence_(cur.name, past.name) || isSubsequence_(past.name, cur.name);
       if(isSubsequence) {
         past.name = longer;
         past.matched_name = personChosen.matched_name;

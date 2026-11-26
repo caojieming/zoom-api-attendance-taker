@@ -154,7 +154,7 @@ function rankAttendance() {
  */
 function mergeSimilarParticipants_(participants) {
   // Merge participants that satisfy stringSimilarity_() >= SIMILARITY_THRESHOLD_RATIO
-  // Also merge participants when one name is directly contained in the other, as long as the shorter name is at least PARTIAL_NAME_THRESHOLD characters long.
+  // Also merge participants when one name is directly contained in the other, as long as both names are at least 5 (default) characters long.
   // For direct containment, only merge when the shorter name is a whole word or a prefix of the longer name, not just any substring match. Choose the longest name as the main name.
   // merged attended = sum of all attended
   // merged durationsByDate includes all dateLabels (no collisions assumed), sorted in reverse alphabetical order.
@@ -187,13 +187,8 @@ function mergeSimilarParticipants_(participants) {
         if(!participants[baseIdx].matched_name && !participants[j].matched_name) {
           const nameA = participants[baseIdx].name;
           const nameB = participants[j].name;
-
-          const shorter = nameA.length <= nameB.length ? nameA : nameB;
-          const longer = nameA.length > nameB.length ? nameA : nameB;
-
-          // shorter name is a direct subsequence to the longer name
           // subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
-          const isSubsequence = isSubsequence_(longer, shorter) && shorter.length >= PARTIAL_NAME_THRESHOLD;
+          const isSubsequence = isSubsequence_(nameA, nameB) || isSubsequence_(nameB, nameA);
 
           const isSimilar = stringSimilarity_(nameA, nameB) >= SIMILARITY_THRESHOLD_RATIO;
 

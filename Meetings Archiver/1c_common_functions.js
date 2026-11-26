@@ -349,7 +349,11 @@ function editDistance_(s1, s2) {
  * return true if partString is a subsequence of mainString
  * subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
  */
-function isSubsequence_(mainString, partString) {
+/**
+ * return true if partString is a subsequence of mainString
+ * subsequence: a string that can be derived from another string by deleting some chars without changing the order of the remaining chars
+ */
+function isSubsequence_(mainString, partString, minStrLen = 5) {
   mainString = mainString.replace(/[^a-zA-Z]/g, '').toLowerCase();
   partString = partString.replace(/[^a-zA-Z]/g, '').toLowerCase();
   let i = 0, j = 0;
@@ -358,7 +362,8 @@ function isSubsequence_(mainString, partString) {
     i++;
   }
   // If j reaches end of partString, that means all characters of partString were found in mainString
-  return j === partString.length;
+  // minStrLen is a safeguard to prevent coincidental subsequence recognition due to being extremely generic
+  return j === partString.length && mainString.length >= minStrLen && partString.length >= minStrLen;
 }
 
 
